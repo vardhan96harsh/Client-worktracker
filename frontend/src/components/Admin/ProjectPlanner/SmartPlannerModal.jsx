@@ -399,53 +399,15 @@ export default function SmartPlannerModal({
             detectedPM = u;
           }
 
-          // Check Role for Squad
+          // Infer role strictly from user's actual designation
           let roleCategory = "DEVELOPER";
-          if (
-            contextWindow.includes("id") ||
-            contextWindow.includes("instructional") ||
-            contextWindow.includes("storyboard") ||
-            contextWindow.includes("content") ||
-            contextWindow.includes("writer")
-          ) {
-            roleCategory = "ID";
-          } else if (
-            contextWindow.includes("animat") ||
-            contextWindow.includes("motion") ||
-            contextWindow.includes("after effects") ||
-            contextWindow.includes("2d")
-          ) {
-            roleCategory = "ANIMATOR";
-          } else if (
-            contextWindow.includes("designer") ||
-            contextWindow.includes("graphic") ||
-            contextWindow.includes("visual") ||
-            contextWindow.includes("ui")
-          ) {
-            roleCategory = "DESIGNER";
-          } else if (
-            contextWindow.includes("qa") ||
-            contextWindow.includes("tester") ||
-            contextWindow.includes("review") ||
-            contextWindow.includes("qc")
-          ) {
-            roleCategory = "QA";
-          } else if (
-            contextWindow.includes("dev") ||
-            contextWindow.includes("developer") ||
-            contextWindow.includes("author") ||
-            contextWindow.includes("programmer")
-          ) {
-            roleCategory = "DEVELOPER";
-          } else {
-            // Infer from user's designation
-            const desig = (u.designation || "").toUpperCase();
-            if (desig.includes("INSTRUCT") || desig.includes("ID")) roleCategory = "ID";
-            else if (desig.includes("ANIM") || desig.includes("MOTION")) roleCategory = "ANIMATOR";
-            else if (desig.includes("DESIGN") || desig.includes("GRAPHIC") || desig.includes("VISUAL")) roleCategory = "DESIGNER";
-            else if (desig.includes("QA") || desig.includes("TEST")) roleCategory = "QA";
-            else roleCategory = "DEVELOPER";
-          }
+          const desig = (u.designation || "").toUpperCase();
+          if (desig.includes("INSTRUCT") || desig.includes("ID") || desig.includes("CONTENT") || desig.includes("STORYBOARD")) roleCategory = "ID";
+          else if (desig.includes("ANIM") || desig.includes("MOTION")) roleCategory = "ANIMATOR";
+          else if (desig.includes("DESIGN") || desig.includes("GRAPHIC") || desig.includes("VISUAL")) roleCategory = "DESIGNER";
+          else if (desig.includes("QA") || desig.includes("TEST") || desig.includes("QUALITY")) roleCategory = "QA";
+          else if (desig.includes("PM") || desig.includes("MANAGER")) roleCategory = "PM";
+          else if (desig.includes("DEV") || desig.includes("AUTHOR") || desig.includes("STORYLINE") || desig.includes("SOFTWARE")) roleCategory = "DEVELOPER";
 
           if (!detectedTeamMap.has(u._id)) {
             detectedTeamMap.set(u._id, { user: u, roleCategory });
@@ -464,22 +426,23 @@ export default function SmartPlannerModal({
         detectedPM = adminOrManager || activeUsers[0] || null;
       }
 
-      // If team map is empty, suggest 1 ID and 1 Developer
+      // If team map is empty, suggest matching ID and Developer candidates strictly by designation
       if (detectedTeamMap.size === 0) {
         const idCand = activeUsers.find(
           (u) =>
             u._id !== detectedPM?._id &&
             (String(u.designation || "").toLowerCase().includes("instruction") ||
               String(u.designation || "").toLowerCase().includes("id"))
-        ) || activeUsers[1] || activeUsers[0];
+        );
 
         const devCand = activeUsers.find(
           (u) =>
             u._id !== detectedPM?._id &&
             u._id !== idCand?._id &&
             (String(u.designation || "").toLowerCase().includes("dev") ||
-              String(u.designation || "").toLowerCase().includes("author"))
-        ) || activeUsers[2] || activeUsers[0];
+              String(u.designation || "").toLowerCase().includes("author") ||
+              String(u.designation || "").toLowerCase().includes("storyline"))
+        );
 
         if (idCand) detectedTeamMap.set(idCand._id, { user: idCand, roleCategory: "ID" });
         if (devCand && devCand._id !== idCand?._id) {
@@ -945,7 +908,7 @@ export default function SmartPlannerModal({
                   >
                     {availableComplexities.map((c) => (
                       <option key={c.id || c.name} value={c.id || c.name}>
-                        {c.name} {c.effortMultiplier ? `(${c.effortMultiplier}x)` : ""}
+                        {c.name}
                       </option>
                     ))}
                   </select>

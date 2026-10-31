@@ -231,3 +231,206 @@ export const DEFAULT_TEMPLATES = [
     ]
   }
 ];
+
+/**
+ * Combines one or multiple project types into a single consolidated workflow template.
+ * If 1 type is passed, returns the native template directly.
+ * If multiple types are passed (e.g. Storyline + Video + PDF + Rise), combines them into a multi-deliverable pipeline.
+ */
+export function getCombinedTemplate(projectTypes) {
+  const typeList = (Array.isArray(projectTypes)
+    ? projectTypes
+    : String(projectTypes || '').split(',').map((s) => s.trim())
+  ).filter(Boolean);
+
+  const matchedTemplates = typeList
+    .map((id) => DEFAULT_TEMPLATES.find((t) => t.id === id))
+    .filter(Boolean);
+
+  if (matchedTemplates.length === 0) {
+    return DEFAULT_TEMPLATES[0]; // fallback to storyline-360
+  }
+
+  if (matchedTemplates.length === 1) {
+    return matchedTemplates[0];
+  }
+
+  // Multi-type combination
+  const hasStoryline = matchedTemplates.some((t) => t.id === 'storyline-360');
+  const hasRise = matchedTemplates.some((t) => t.id === 'rise-360');
+  const hasVideo = matchedTemplates.some((t) => t.id === 'mp4-video');
+  const hasPdf = matchedTemplates.some((t) => t.id === 'pdf-graphic');
+
+  const combinedPhases = [
+    // Phase 1: Initiation
+    {
+      id: 'phase-initiation',
+      name: 'Phase 1 — Project Initiation & Requirements Audit',
+      isModuleLevel: false,
+      tasks: [
+        { id: 'task-kickoff', name: 'Project Kickoff & Alignment', role: 'Project Manager', defaultHours: 7, dependsOn: [] },
+        { id: 'task-req-analysis', name: 'Requirement Analysis & Content Ingestion', role: 'Instructional Designer', defaultHours: 14, dependsOn: ['task-kickoff'] },
+        ...(hasVideo ? [{ id: 'task-video-brief', name: '[Video] Creative Brief & Style Direction', role: 'Project Manager', defaultHours: 7, dependsOn: ['task-kickoff'] }] : []),
+        ...(hasPdf ? [{ id: 'task-pdf-brief', name: '[PDF] Creative Brief & Layout Specification', role: 'Project Manager', defaultHours: 7, dependsOn: ['task-kickoff'] }] : []),
+      ],
+    },
+
+    // Phase 2: Instructional Design & Storyboard
+    {
+      id: 'phase-instructional-design',
+      name: 'Phase 2 — Script Development & Instructional Storyboard',
+      isModuleLevel: true,
+      tasks: [
+        ...(hasStoryline ? [
+          { id: 'task-script-dev', name: '[Storyline] Script Development & Content Outlining', role: 'Instructional Designer', defaultHours: 7, dependsOn: ['task-req-analysis'] },
+          { id: 'task-storyboard-dev', name: '[Storyline] Storyboard Development: Screen-by-Screen', role: 'Instructional Designer', dynamicRole: 'ID', rateKey: 'idStoryboard', dependsOn: ['task-script-dev'] },
+          { id: 'task-internal-sb', name: '[Storyline] Internal Storyboard Review & Polish', role: 'Instructional Designer', defaultHours: 3.5, dependsOn: ['task-storyboard-dev'] },
+          { id: 'task-client-sb', name: '[Storyline] Client Storyboard Review Cycle', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-internal-sb'] },
+          { id: 'task-sb-revisions', name: '[Storyline] Storyboard Revisions & Freeze Sign-off', role: 'Instructional Designer', defaultHours: 7, dependsOn: ['task-client-sb'] },
+        ] : []),
+        ...(hasRise ? [
+          { id: 'task-rise-content', name: '[Rise 360] Content Draft & Knowledge Checks', role: 'Instructional Designer', dynamicRole: 'ID', rateKey: 'idStoryboard', dependsOn: ['task-req-analysis'] },
+          { id: 'task-rise-client-content', name: '[Rise 360] Client Content Review & Approval', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-rise-content'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-video-script', name: '[Video] Scriptwriting & Narrative Flow', role: 'Instructional Designer', dynamicRole: 'ID', rateKey: 'idStoryboard', dependsOn: ['task-req-analysis'] },
+          { id: 'task-video-script-approval', name: '[Video] Client Script Approval & Table Read', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-video-script'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-outline', name: '[PDF] Content Outline & Copy Editing', role: 'Instructional Designer', dynamicRole: 'ID', rateKey: 'idStoryboard', dependsOn: ['task-req-analysis'] },
+          { id: 'task-pdf-concept-approval', name: '[PDF] Blueprint & Layout Structure Sign-off', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-pdf-outline'] },
+        ] : []),
+      ],
+    },
+
+    // Phase 3: Visual Design & Media Assets
+    {
+      id: 'phase-visual-design',
+      name: 'Phase 3 — Visual Design & Creative Media Assets',
+      isModuleLevel: true,
+      tasks: [
+        ...(hasStoryline ? [
+          { id: 'task-ui-assets', name: '[Storyline] Custom UI Graphics & Character Development', role: 'Visual Designer', defaultHours: 14, dependsOn: [hasStoryline ? 'task-sb-revisions' : 'task-req-analysis'] },
+          { id: 'task-client-asset-approval', name: '[Storyline] Client Approval on Visual Assets & Media', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-ui-assets'] },
+          { id: 'task-audio-vo', name: '[Storyline] Voiceover Studio Recording & Clean Audio', role: 'Voiceover Artist', isExternalIfNoVO: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-sb-revisions'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-vo-record', name: '[Video] Voiceover Talent Recording & Mastering', role: 'Voiceover Artist', isExternalIfNoVO: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-video-script-approval'] },
+          { id: 'task-visual-sb', name: '[Video] Illustrated Scene Storyboard & Style Frames', role: 'Visual Designer', defaultHours: 14, dependsOn: ['task-vo-record'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-master-template', name: '[PDF] Master Template & Grid Layout Design', role: 'Visual Designer', defaultHours: 14, dependsOn: ['task-pdf-concept-approval'] },
+          { id: 'task-pdf-infographics', name: '[PDF] Bespoke Graphic Assets & Infographics', role: 'Visual Designer', defaultHours: 14, dependsOn: ['task-pdf-master-template'] },
+        ] : []),
+        ...(hasRise ? [
+          { id: 'task-rise-media', name: '[Rise 360] Graphic Banners, Infographics & Micro-media', role: 'Visual Designer', defaultHours: 7, dependsOn: ['task-rise-client-content'] },
+        ] : []),
+      ],
+    },
+
+    // Phase 4: Development, Animation & Authoring
+    {
+      id: 'phase-development',
+      name: 'Phase 4 — Development, Motion Animation & Multi-Format Authoring',
+      isModuleLevel: true,
+      tasks: [
+        ...(hasStoryline ? [
+          { id: 'task-hld-concept', name: '[Storyline] High-Level Design (HLD) Concept Slide', role: 'Course Developer', isConditional: true, conditionalKey: 'includeHld', defaultHours: 7, dependsOn: ['task-client-asset-approval'] },
+          { id: 'task-client-hld', name: '[Storyline] Client HLD Sign-off / CS HLD', role: 'Client Stakeholder', isClientTask: true, isConditional: true, conditionalKey: 'includeHld', defaultHours: 0, defaultDays: 1, dependsOn: ['task-hld-concept'] },
+          { id: 'task-2d-anim', name: '[Storyline] Animation & Visual FX', role: 'Animator', dynamicRole: 'ANIMATOR', rateKey: 'animatorRate', dependsOn: ['task-client-asset-approval'] },
+          { id: 'task-storyline-dev', name: '[Storyline] Interactive Slide Programming', role: 'Course Developer', dynamicRole: 'DEVELOPER', rateKey: 'developerRate', dependsOn: ['task-client-asset-approval'] },
+          { id: 'task-integration', name: '[Storyline] Internal Media Integration & Alpha Build', role: 'Course Developer', defaultHours: 7, dependsOn: ['task-2d-anim', 'task-storyline-dev'] },
+        ] : []),
+        ...(hasRise ? [
+          { id: 'task-rise-block-dev', name: '[Rise 360] Interactive Block Assembly', role: 'Course Developer', dynamicRole: 'DEVELOPER', rateKey: 'developerRate', dependsOn: ['task-rise-media'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-scene-animation', name: '[Video] Scene Animation & Motion Rigging', role: 'Animator', dynamicRole: 'ANIMATOR', rateKey: 'animatorRate', dependsOn: ['task-visual-sb'] },
+          { id: 'task-sound-sfx', name: '[Video] Sound FX & Background Score Mixing', role: 'Animator', defaultHours: 7, dependsOn: ['task-scene-animation'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-typesetting', name: '[PDF] Full Document Page Typesetting', role: 'Course Developer', dynamicRole: 'DEVELOPER', rateKey: 'developerRate', dependsOn: ['task-pdf-infographics'] },
+          { id: 'task-pdf-interactivity', name: '[PDF] Interactive Bookmarks & Form Controls', role: 'Course Developer', defaultHours: 7, dependsOn: ['task-pdf-typesetting'] },
+        ] : []),
+      ],
+    },
+
+    // Phase 5: QA & Multi-Device Testing
+    {
+      id: 'phase-qa',
+      name: 'Phase 5 — Quality Assurance & Multi-Device Testing',
+      isModuleLevel: true,
+      tasks: [
+        ...(hasStoryline ? [
+          { id: 'task-func-qa', name: '[Storyline] Functional, SCORM & a11y QA', role: 'QA Specialist', dynamicRole: 'QA', rateKey: 'qaRate', dependsOn: ['task-integration'] },
+          { id: 'task-qa-fixes', name: '[Storyline] Developer Bug Fixes & Refinements', role: 'Course Developer', defaultHours: 7, dependsOn: ['task-func-qa'] },
+          { id: 'task-qa-signoff', name: '[Storyline] Beta Build QA Sign-off', role: 'QA Specialist', defaultHours: 3.5, dependsOn: ['task-qa-fixes'] },
+        ] : []),
+        ...(hasRise ? [
+          { id: 'task-cross-device-qa', name: '[Rise 360] Cross-Device & Mobile Responsiveness QA', role: 'QA Specialist', dynamicRole: 'QA', rateKey: 'qaRate', dependsOn: ['task-rise-block-dev'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-video-qa', name: '[Video] Internal Timing, Audio & Subtitles QA', role: 'QA Specialist', defaultHours: 7, dependsOn: ['task-sound-sfx'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-qa', name: '[PDF] Internal Layout & Typography QA', role: 'QA Specialist', dynamicRole: 'QA', rateKey: 'qaRate', dependsOn: ['task-pdf-interactivity'] },
+        ] : []),
+      ],
+    },
+
+    // Phase 6: Client Review & Feedback Polish
+    {
+      id: 'phase-client-review',
+      name: 'Phase 6 — Client Review & Feedback Polish',
+      isModuleLevel: true,
+      tasks: [
+        ...(hasStoryline ? [
+          { id: 'task-client-beta', name: '[Storyline] Client Beta Review on Review 360 / Staging LMS', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-qa-signoff'] },
+          { id: 'task-feedback-fixes', name: '[Storyline] Client Feedback Implementation & Polish', role: 'Course Developer', defaultHours: 7, dependsOn: ['task-client-beta'] },
+          { id: 'task-gold-approval', name: '[Storyline] Client Gold Master Sign-off', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 1, dependsOn: ['task-feedback-fixes'] },
+        ] : []),
+        ...(hasRise ? [
+          { id: 'task-client-review-pkg', name: '[Rise 360] Client Review on Review 360', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-cross-device-qa'] },
+          { id: 'task-rise-client-fixes', name: '[Rise 360] Client Feedback Implementation & Polish', role: 'Course Developer', defaultHours: 7, dependsOn: ['task-client-review-pkg'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-client-video-approval', name: '[Video] Client Video Review & Final Cut Approval', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-video-qa'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-client-review', name: '[PDF] Client Document Review & Feedback', role: 'Client Stakeholder', isClientTask: true, defaultHours: 0, defaultDays: 2, dependsOn: ['task-pdf-qa'] },
+        ] : []),
+      ],
+    },
+
+    // Phase 7: Delivery & Project Closure
+    {
+      id: 'phase-delivery',
+      name: 'Phase 7 — Multi-Format Delivery, Packaging & Project Closure',
+      isModuleLevel: false,
+      tasks: [
+        ...(hasStoryline || hasRise ? [
+          { id: 'task-scorm-packaging', name: 'LMS SCORM 1.2 / 2004 / xAPI Final Package Export', role: 'Course Developer', defaultHours: 7, dependsOn: [hasStoryline ? 'task-gold-approval' : 'task-rise-client-fixes'] },
+          { id: 'task-lms-validation', name: 'LMS Staging Validation & Sanity Verification', role: 'QA Specialist', defaultHours: 7, dependsOn: ['task-scorm-packaging'] },
+        ] : []),
+        ...(hasVideo ? [
+          { id: 'task-mp4-delivery', name: '[Video] High-Res MP4 Video Delivery with Captions', role: 'Animator', defaultHours: 3.5, dependsOn: ['task-client-video-approval'] },
+        ] : []),
+        ...(hasPdf ? [
+          { id: 'task-pdf-preflight', name: '[PDF] Pre-flight Print & Digital PDF Compliance', role: 'QA Specialist', defaultHours: 7, dependsOn: ['task-pdf-client-review'] },
+          { id: 'task-pdf-final-delivery', name: '[PDF] High-Res Interactive PDF & Source Assets Delivery', role: 'Project Manager', defaultHours: 3.5, dependsOn: ['task-pdf-preflight'] },
+        ] : []),
+        { id: 'task-final-handover', name: 'Final Source Files & Asset Handover', role: 'Project Manager', defaultHours: 3.5, dependsOn: [] },
+        { id: 'task-project-closure', name: 'Formal Project Retrospective & Contract Closure', role: 'Project Manager', defaultHours: 3.5, dependsOn: ['task-final-handover'] },
+      ],
+    },
+  ];
+
+  return {
+    id: typeList.join('-'),
+    name: matchedTemplates.map((t) => t.name).join(' + '),
+    description: `Multi-track deliverable covering: ${matchedTemplates.map((t) => t.name).join(', ')}.`,
+    icon: 'layers',
+    phases: combinedPhases,
+  };
+}
+

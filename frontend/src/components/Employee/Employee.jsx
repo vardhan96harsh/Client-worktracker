@@ -223,7 +223,11 @@ export default function Employee({ auth, onLogout }) {
         {/* RIGHT CONTENT */}
         <main className="flex-1 overflow-y-auto bg-slate-50 p-3">
           {tab === "timer" && (
-            <WorkTimer auth={auth} initialSelectedTask={preselectedTask} />
+            <WorkTimer
+              auth={auth}
+              initialSelectedTask={preselectedTask}
+              onClearInitialTask={() => setPreselectedTask(null)}
+            />
           )}
 
           {tab === "tasks" && (

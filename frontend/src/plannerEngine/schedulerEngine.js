@@ -9,7 +9,7 @@ import { CalendarEngine } from './calendarEngine.js';
 import { EstimationEngine } from './estimationEngine.js';
 import { CriticalPathEngine } from './criticalPathEngine.js';
 import { DEFAULT_COMPLEXITY_CONFIG } from './complexityConfig.js';
-import { DEFAULT_TEMPLATES } from './defaultTemplates.js';
+import { DEFAULT_TEMPLATES, getCombinedTemplate } from './defaultTemplates.js';
 
 export class SchedulerEngine {
   /**
@@ -20,6 +20,7 @@ export class SchedulerEngine {
     projectName = 'eLearning Courseware',
     clientName = 'Enterprise Client',
     projectType = 'storyline-360',
+    projectTypes = null,
     startPhaseId = null,
     complexity = 'Medium',
     courseLengthMinutes = 60,
@@ -35,7 +36,21 @@ export class SchedulerEngine {
     includeHld = false
   }) {
     const hoursPerDay = complexityConfig.hoursPerWorkingDay || 7;
-    const template = customTemplate || DEFAULT_TEMPLATES.find(t => t.id === projectType) || DEFAULT_TEMPLATES[0];
+    // Resolve multiple or single project types
+    let effectiveTypes = [];
+    if (Array.isArray(projectTypes) && projectTypes.length > 0) {
+      effectiveTypes = projectTypes;
+    } else if (Array.isArray(projectType)) {
+      effectiveTypes = projectType;
+    } else if (typeof projectType === 'string' && projectType.includes(',')) {
+      effectiveTypes = projectType.split(',').map((s) => s.trim()).filter(Boolean);
+    } else if (projectType) {
+      effectiveTypes = [projectType];
+    } else {
+      effectiveTypes = ['storyline-360'];
+    }
+
+    const template = customTemplate || getCombinedTemplate(effectiveTypes);
 
     // Determine Starting Phase Index (Robust matching for ID, name, number, or keyword)
     let startPhaseIdx = 0;
@@ -95,7 +110,8 @@ export class SchedulerEngine {
 
     // Compute hour/minute breakdown
     const estimation = EstimationEngine.calculateBreakdown({
-      projectType,
+      projectType: effectiveTypes.length === 1 ? effectiveTypes[0] : effectiveTypes.join(', '),
+      projectTypes: effectiveTypes,
       courseLengthMinutes,
       moduleCount,
       complexity,
@@ -710,7 +726,8 @@ export class SchedulerEngine {
       projectId,
       projectName,
       clientName,
-      projectType,
+      projectType: effectiveTypes.length === 1 ? effectiveTypes[0] : effectiveTypes.join(', '),
+      projectTypes: effectiveTypes,
       startPhaseId: activeStartPhase.id,
       startPhaseName: activeStartPhase.name,
       complexity,
@@ -722,7 +739,10 @@ export class SchedulerEngine {
       totalCalendarDays,
       nonWorkingDays,
       projectManager: projectManager || getRoleCapacityAndResources('PM').primaryResource,
-      assignedTeam,
+      assignedTeam: assignedTeam.map((m) => ({
+        ...m,
+        roleCategory: normalizeRoleKey(m.roleCategory || m.designation),
+      })),
       teamCapacityByRole: {
         PM: getRoleCapacityAndResources('PM').dailyCapacity,
         ID: getRoleCapacityAndResources('ID').dailyCapacity,

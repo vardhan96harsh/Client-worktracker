@@ -21,6 +21,17 @@ const STATUS_CLASSES = {
   "On Hold": "bg-amber-50 text-amber-700 border-amber-200",
 };
 
+const ROLE_BADGES = {
+  ID: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  DEVELOPER: "bg-sky-50 text-sky-700 border-sky-200",
+  ANIMATOR: "bg-violet-50 text-violet-700 border-violet-200",
+  DESIGNER: "bg-amber-50 text-amber-700 border-amber-200",
+  QA: "bg-rose-50 text-rose-700 border-rose-200",
+  PM: "bg-purple-50 text-purple-700 border-purple-200",
+  VO: "bg-teal-50 text-teal-700 border-teal-200",
+  CLIENT: "bg-yellow-50 text-yellow-700 border-yellow-200",
+};
+
 export default function TaskTable({ project, onStatusChange, onEditTask }) {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
@@ -29,8 +40,16 @@ export default function TaskTable({ project, onStatusChange, onEditTask }) {
   const filteredTasks = useMemo(() => {
     if (!project || !Array.isArray(project.tasks)) return [];
     return project.tasks.filter((t) => {
-      if (roleFilter !== "ALL" && (t.roleCategory || "").toUpperCase() !== roleFilter.toUpperCase()) {
-        return false;
+      if (roleFilter !== "ALL") {
+        const cat = String(t.roleCategory || t.role || "").toUpperCase();
+        let norm = "DEVELOPER";
+        if (cat === "ID" || cat.includes("ID") || cat.includes("INSTRUCT") || cat.includes("STORYBOARD")) norm = "ID";
+        else if (cat === "ANIMATOR" || cat.includes("ANIM") || cat.includes("MOTION")) norm = "ANIMATOR";
+        else if (cat === "QA" || cat.includes("QA") || cat.includes("TEST") || cat.includes("QUALITY")) norm = "QA";
+        else if (cat === "DESIGNER" || cat.includes("DESIGN") || cat.includes("GRAPHIC") || cat.includes("VISUAL")) norm = "DESIGNER";
+        else if (cat === "PM" || cat.includes("PM") || cat.includes("MANAGER")) norm = "PM";
+        else if (cat === "VO" || cat.includes("VOICE") || cat.includes("AUDIO")) norm = "VO";
+        if (norm !== roleFilter.toUpperCase()) return false;
       }
       if (statusFilter !== "ALL" && (t.status || "Not Started") !== statusFilter) {
         return false;
@@ -146,7 +165,9 @@ export default function TaskTable({ project, onStatusChange, onEditTask }) {
                   {/* Role / Assignee */}
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                      <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-bold ${
+                        ROLE_BADGES[t.roleCategory] || "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}>
                         {t.roleCategory || t.role}
                       </span>
                       {t.assignedResource?.name && (

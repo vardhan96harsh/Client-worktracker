@@ -356,10 +356,10 @@ export default function AdminSidebarCalendar({ auth, theme: propTheme }) {
       </div>
 
       {/* ── 4. CALENDAR & SIDEBAR GRID ── */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
 
         {/* ── MAIN CALENDAR GRID ── */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm flex flex-col">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm flex flex-col min-w-0">
 
           {/* Month Navigation Header */}
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
@@ -390,112 +390,117 @@ export default function AdminSidebarCalendar({ auth, theme: propTheme }) {
             </div>
           </div>
 
-          {/* Days of Week Header */}
-          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, idx) => (
-              <div
-                key={d}
-                className={`py-3 text-center text-[11px] font-bold uppercase tracking-wider ${
-                  idx === 0 || idx === 6 ? "text-blue-600 bg-blue-50/30" : "text-slate-500"
-                }`}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar Day Cells */}
-          <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 flex-1">
-            {days.map((day, i) => {
-              if (!day) {
-                return (
+          {/* Scrollable calendar table container preventing horizontal cropping on smaller screens */}
+          <div className="overflow-x-auto w-full">
+            <div className="min-w-[650px] flex flex-col">
+              {/* Days of Week Header */}
+              <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, idx) => (
                   <div
-                    key={`empty-${i}`}
-                    className="min-h-[110px] bg-slate-50/40"
-                  />
-                );
-              }
+                    key={d}
+                    className={`py-3 text-center text-[11px] font-bold uppercase tracking-wider ${
+                      idx === 0 || idx === 6 ? "text-blue-600 bg-blue-50/30" : "text-slate-500"
+                    }`}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
 
-              const key = dateKey(day);
-              const holiday = holidayMap[key];
-              const cellDate = new Date(year, month, day);
-              const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+              {/* Calendar Day Cells */}
+              <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 flex-1">
+                {days.map((day, i) => {
+                  if (!day) {
+                    return (
+                      <div
+                        key={`empty-${i}`}
+                        className="min-h-[110px] bg-slate-50/40"
+                      />
+                    );
+                  }
 
-              const isToday =
-                day === today.getDate() &&
-                month === today.getMonth() &&
-                year === today.getFullYear();
+                  const key = dateKey(day);
+                  const holiday = holidayMap[key];
+                  const cellDate = new Date(year, month, day);
+                  const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
 
-              const typeConfig = HOLIDAY_TYPES.find(t => t.id === holiday?.type) || HOLIDAY_TYPES[0];
+                  const isToday =
+                    day === today.getDate() &&
+                    month === today.getMonth() &&
+                    year === today.getFullYear();
 
-              return (
-                <div
-                  key={key}
-                  onClick={() => {
-                    if (holiday) {
-                      startEdit(holiday);
-                    } else {
-                      openAddModal(key);
-                    }
-                  }}
-                  className={`group relative min-h-[110px] p-2.5 transition flex flex-col justify-between cursor-pointer select-none ${
-                    holiday
-                      ? `${typeConfig.color} shadow-xs`
-                      : isWeekend
-                      ? "bg-slate-50/50 hover:bg-blue-50/40"
-                      : "bg-white hover:bg-blue-50/30"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition ${
-                        isToday
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : holiday
-                          ? "bg-white/90 font-extrabold shadow-xs text-slate-900"
+                  const typeConfig = HOLIDAY_TYPES.find(t => t.id === holiday?.type) || HOLIDAY_TYPES[0];
+
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => {
+                        if (holiday) {
+                          startEdit(holiday);
+                        } else {
+                          openAddModal(key);
+                        }
+                      }}
+                      className={`group relative min-h-[110px] p-2.5 transition flex flex-col justify-between cursor-pointer select-none min-w-0 ${
+                        holiday
+                          ? `${typeConfig.color} shadow-xs`
                           : isWeekend
-                          ? "text-slate-400 font-semibold"
-                          : "text-slate-700 font-semibold"
+                          ? "bg-slate-50/50 hover:bg-blue-50/40"
+                          : "bg-white hover:bg-blue-50/30"
                       }`}
                     >
-                      {day}
-                    </span>
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
+                            isToday
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : holiday
+                              ? "bg-white/90 font-extrabold shadow-xs text-slate-900"
+                              : isWeekend
+                              ? "text-slate-400 font-semibold"
+                              : "text-slate-700 font-semibold"
+                          }`}
+                        >
+                          {day}
+                        </span>
 
-                    {/* Hover Quick Add Indicator */}
-                    {!holiday && (
-                      <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-blue-600 flex items-center gap-0.5 transition">
-                        <Plus size={12} />
-                      </span>
-                    )}
+                        {/* Hover Quick Add Indicator */}
+                        {!holiday && (
+                          <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-blue-600 flex items-center gap-0.5 transition shrink-0">
+                            <Plus size={12} />
+                          </span>
+                        )}
 
-                    {holiday && (
-                      <span className={`h-2 w-2 rounded-full ${typeConfig.badge}`} />
-                    )}
-                  </div>
-
-                  {holiday ? (
-                    <div className="mt-1.5 rounded-xl bg-white/95 p-1.5 shadow-xs border border-slate-200/80 flex flex-col gap-0.5">
-                      <div className="text-[11px] font-bold text-slate-900 truncate" title={holiday.name}>
-                        {holiday.name}
+                        {holiday && (
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${typeConfig.badge}`} />
+                        )}
                       </div>
-                      <div className="flex items-center justify-between text-[9px] font-medium text-slate-500">
-                        <span className="capitalize">{holiday.type || "Company"}</span>
-                        <span className="text-blue-600 font-semibold">Off</span>
-                      </div>
+
+                      {holiday ? (
+                        <div className="mt-1.5 rounded-xl bg-white/95 p-1.5 shadow-xs border border-slate-200/80 flex flex-col gap-0.5 min-w-0 overflow-hidden">
+                          <div className="text-[11px] font-bold text-slate-900 truncate" title={holiday.name}>
+                            {holiday.name}
+                          </div>
+                          <div className="flex items-center justify-between text-[9px] font-medium text-slate-500 gap-1">
+                            <span className="capitalize truncate">{holiday.type || "Company"}</span>
+                            <span className="text-blue-600 font-semibold shrink-0">Off</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[10px] text-slate-300 font-medium group-hover:text-slate-400 transition truncate">
+                          {isWeekend ? "Weekend" : "Work day"}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="mt-2 text-[10px] text-slate-300 font-medium group-hover:text-slate-400 transition">
-                      {isWeekend ? "Weekend" : "Work day"}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* ── RIGHT SIDEBAR: THIS MONTH & ALL HOLIDAYS ── */}
-        <aside className="space-y-4">
+        <aside className="space-y-4 min-w-0 grid gap-4 sm:grid-cols-2 xl:grid-cols-1 content-start">
 
           {/* 1. Holidays in Current Month */}
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">

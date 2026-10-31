@@ -16,11 +16,18 @@ import {
 } from "lucide-react";
 import { api } from "../../../api.js";
 import { PROJECT_TYPE_COMPLEXITIES, DEFAULT_COMPLEXITY_CONFIG } from "../../../plannerEngine/complexityConfig.js";
-import { DEFAULT_TEMPLATES } from "../../../plannerEngine/defaultTemplates.js";
+import { DEFAULT_TEMPLATES, getCombinedTemplate } from "../../../plannerEngine/defaultTemplates.js";
 import { EstimationEngine } from "../../../plannerEngine/estimationEngine.js";
 import { CalendarEngine } from "../../../plannerEngine/calendarEngine.js";
 import { SchedulerEngine } from "../../../plannerEngine/schedulerEngine.js";
 import { getNextProjectCode, getCompanyPrefix } from "../../../utils/projectCodeGenerator.js";
+
+const PROJECT_TYPE_OPTIONS = [
+  { id: "storyline-360", label: "Storyline 360", desc: "Custom interactive courseware" },
+  { id: "rise-360", label: "Rise 360", desc: "Responsive microlearning blocks" },
+  { id: "mp4-video", label: "MP4 Video", desc: "Motion graphics & video editing" },
+  { id: "pdf-graphic", label: "PDF / Graphic", desc: "Print & interactive documents" },
+];
 
 const getUserId = (u) => {
   if (!u) return "";
@@ -55,7 +62,7 @@ export default function ProjectPlanSetupModal({
   const [newProjectCode, setNewProjectCode] = useState("");
 
   const [clientName, setClientName] = useState("");
-  const [projectType, setProjectType] = useState("storyline-360");
+  const [projectTypes, setProjectTypes] = useState(["storyline-360"]);
   const [complexity, setComplexity] = useState("Level 2");
   const [startPhaseId, setStartPhaseId] = useState("");
   const [startDate, setStartDate] = useState(() => CalendarEngine.toISODate(new Date()));
@@ -140,17 +147,24 @@ export default function ProjectPlanSetupModal({
     return list;
   }, [companyId, categoryId, liveProjects, projects, initialPlan]);
 
-  // Available complexity levels for selected project type
+  // Available complexity levels for selected project type(s)
   const availableComplexities = useMemo(() => {
     const cpxMap = complexityConfig?.projectTypeComplexities || PROJECT_TYPE_COMPLEXITIES;
-    return cpxMap[projectType] || PROJECT_TYPE_COMPLEXITIES[projectType] || PROJECT_TYPE_COMPLEXITIES["storyline-360"] || [];
-  }, [complexityConfig, projectType]);
+    const key = projectTypes.includes("storyline-360")
+      ? "storyline-360"
+      : (projectTypes[0] || "storyline-360");
+    return cpxMap[key] || PROJECT_TYPE_COMPLEXITIES[key] || PROJECT_TYPE_COMPLEXITIES["storyline-360"] || [];
+  }, [complexityConfig, projectTypes]);
 
-  // Available phases for selected project type
+  // Available phases for selected project type(s)
   const availablePhases = useMemo(() => {
-    const tpl = DEFAULT_TEMPLATES.find((t) => t.id === projectType) || DEFAULT_TEMPLATES[0];
+    if (projectTypes.length > 1) {
+      const combined = getCombinedTemplate(projectTypes);
+      return combined?.phases || [];
+    }
+    const tpl = DEFAULT_TEMPLATES.find((t) => t.id === projectTypes[0]) || DEFAULT_TEMPLATES[0];
     return tpl?.phases || [];
-  }, [projectType]);
+  }, [projectTypes]);
 
   // Strictly filter to active users only (never show inactive users)
   const activeUsers = useMemo(() => {
@@ -172,12 +186,12 @@ export default function ProjectPlanSetupModal({
 
     const normalizeCat = (roleOrDesig) => {
       const str = String(roleOrDesig || "").toUpperCase();
-      if (str.includes("PM") || str.includes("MANAGER")) return "PM";
-      if (str.includes("ID") || str.includes("INSTRUCTION") || str.includes("CONTENT")) return "ID";
+      if (str.includes("INSTRUCT") || str.includes("ID") || str.includes("CONTENT") || str.includes("STORYBOARD")) return "ID";
       if (str.includes("ANIM") || str.includes("MOTION")) return "ANIMATOR";
-      if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE")) return "DEVELOPER";
+      if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE") || str.includes("SOFTWARE")) return "DEVELOPER";
       if (str.includes("DESIGN") || str.includes("GRAPHIC") || str.includes("VISUAL")) return "DESIGNER";
       if (str.includes("QA") || str.includes("TEST") || str.includes("QUALITY")) return "QA";
+      if (str.includes("PM") || str.includes("MANAGER")) return "PM";
       if (str.includes("VO") || str.includes("VOICE") || str.includes("AUDIO")) return "VO";
       return "OTHER";
     };
@@ -210,7 +224,15 @@ export default function ProjectPlanSetupModal({
       setNewProjectName(initialPlan.newProjectName || initialPlan.projectName || "");
       setNewProjectCode(initialPlan.newProjectCode || "");
       setClientName(initialPlan.clientName || "");
-      setProjectType(initialPlan.projectType || "storyline-360");
+      let initTypes = ["storyline-360"];
+      if (Array.isArray(initialPlan.projectTypes) && initialPlan.projectTypes.length > 0) {
+        initTypes = initialPlan.projectTypes;
+      } else if (typeof initialPlan.projectType === "string" && initialPlan.projectType.includes(",")) {
+        initTypes = initialPlan.projectType.split(",").map((s) => s.trim()).filter(Boolean);
+      } else if (initialPlan.projectType) {
+        initTypes = [initialPlan.projectType];
+      }
+      setProjectTypes(initTypes);
       setComplexity(initialPlan.complexity || "Level 2");
       setStartPhaseId(initialPlan.startPhaseId || "");
       setStartDate(initialPlan.startDate || CalendarEngine.toISODate(new Date()));
@@ -237,7 +259,7 @@ export default function ProjectPlanSetupModal({
       setNewProjectName("");
       setNewProjectCode("");
       setClientName("");
-      setProjectType("storyline-360");
+      setProjectTypes(["storyline-360"]);
       setComplexity("Level 2");
       setStartPhaseId("");
       setStartDate(CalendarEngine.toISODate(new Date()));
@@ -253,7 +275,7 @@ export default function ProjectPlanSetupModal({
     }
   }, [isOpen, modalMode, initialPlan, companies, activeUsers]);
 
-  // Keep complexity and startPhase in sync when projectType changes
+  // Keep complexity and startPhase in sync when projectTypes changes
   useEffect(() => {
     if (availableComplexities.length > 0) {
       const exists = availableComplexities.some((c) => c.id === complexity || c.name === complexity);
@@ -267,7 +289,7 @@ export default function ProjectPlanSetupModal({
         setStartPhaseId(availablePhases[0].id);
       }
     }
-  }, [projectType, availableComplexities, availablePhases, startPhaseId]);
+  }, [projectTypes, availableComplexities, availablePhases, startPhaseId]);
 
   // Helper to generate next project code for a company
   const generateCodeForCompany = (targetCompanyId = companyId, currentProjects = liveProjects) => {
@@ -328,24 +350,51 @@ export default function ProjectPlanSetupModal({
   // Live effort calculation preview
   const livePreview = useMemo(() => {
     try {
-      const selectedUsersList = activeUsers.filter((u) => selectedUserIds.has(getUserId(u)));
+      const selectedUsersList = activeUsers
+      .filter((u) => selectedUserIds.has(getUserId(u)))
+      .map((u) => {
+        const str = String(u.designation || u.roleCategory || "").toUpperCase();
+        let cat = "DEVELOPER";
+        if (str.includes("INSTRUCT") || str.includes("ID") || str.includes("CONTENT") || str.includes("STORYBOARD")) cat = "ID";
+        else if (str.includes("ANIM") || str.includes("MOTION")) cat = "ANIMATOR";
+        else if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE") || str.includes("SOFTWARE")) cat = "DEVELOPER";
+        else if (str.includes("DESIGN") || str.includes("GRAPHIC") || str.includes("VISUAL")) cat = "DESIGNER";
+        else if (str.includes("QA") || str.includes("TEST") || str.includes("QUALITY")) cat = "QA";
+        else if (str.includes("PM") || str.includes("MANAGER")) cat = "PM";
+        return {
+          ...u,
+          roleCategory: cat,
+          dailyHours: 7,
+        };
+      });
       const pmUser = activeUsers.find((u) => getUserId(u) === String(projectManagerId));
 
       const tempSchedule = SchedulerEngine.generateSchedule({
         projectId: "preview",
         projectName: "Preview",
-        projectType,
+        projectType: projectTypes.join(", "),
+        projectTypes,
         complexity,
         startPhaseId,
         courseLengthMinutes: Number(courseLengthMinutes) || 60,
         moduleCount: Number(moduleCount) || 4,
         startDate,
         projectManager: pmUser,
-        assignedTeam: selectedUsersList.map((u) => ({
-          ...u,
-          roleCategory: u.roleCategory || u.designation || "DEVELOPER",
-          dailyHours: 7,
-        })),
+        assignedTeam: selectedUsersList.map((u) => {
+          const str = String(u.designation || u.roleCategory || "").toUpperCase();
+          let cat = "DEVELOPER";
+          if (str.includes("INSTRUCT") || str.includes("ID") || str.includes("CONTENT") || str.includes("STORYBOARD")) cat = "ID";
+          else if (str.includes("ANIM") || str.includes("MOTION")) cat = "ANIMATOR";
+          else if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE") || str.includes("SOFTWARE")) cat = "DEVELOPER";
+          else if (str.includes("DESIGN") || str.includes("GRAPHIC") || str.includes("VISUAL")) cat = "DESIGNER";
+          else if (str.includes("QA") || str.includes("TEST") || str.includes("QUALITY")) cat = "QA";
+          else if (str.includes("PM") || str.includes("MANAGER")) cat = "PM";
+          return {
+            ...u,
+            roleCategory: cat,
+            dailyHours: 7,
+          };
+        }),
         complexityConfig,
         includeHld,
       });
@@ -362,7 +411,7 @@ export default function ProjectPlanSetupModal({
       return { totalHours: 0, totalWorkingDays: 0, endDate: startDate, teamCount: 0, startPhaseName: "" };
     }
   }, [
-    projectType,
+    projectTypes,
     courseLengthMinutes,
     moduleCount,
     complexity,
@@ -394,6 +443,25 @@ export default function ProjectPlanSetupModal({
     setSelectedUserIds(new Set());
   };
 
+  const toggleProjectType = (typeId) => {
+    setProjectTypes((prev) => {
+      if (prev.includes(typeId)) {
+        if (prev.length <= 1) return prev; // Keep at least one selected
+        return prev.filter((t) => t !== typeId);
+      } else {
+        return [...prev, typeId];
+      }
+    });
+  };
+
+  const handleSelectAllProjectTypes = () => {
+    setProjectTypes(["storyline-360", "rise-360", "mp4-video", "pdf-graphic"]);
+  };
+
+  const handleResetProjectTypes = () => {
+    setProjectTypes(["storyline-360"]);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -412,7 +480,23 @@ export default function ProjectPlanSetupModal({
       return;
     }
 
-    const selectedUsersList = activeUsers.filter((u) => selectedUserIds.has(getUserId(u)));
+    const selectedUsersList = activeUsers
+      .filter((u) => selectedUserIds.has(getUserId(u)))
+      .map((u) => {
+        const str = String(u.designation || u.roleCategory || "").toUpperCase();
+        let cat = "DEVELOPER";
+        if (str.includes("INSTRUCT") || str.includes("ID") || str.includes("CONTENT") || str.includes("STORYBOARD")) cat = "ID";
+        else if (str.includes("ANIM") || str.includes("MOTION")) cat = "ANIMATOR";
+        else if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE") || str.includes("SOFTWARE")) cat = "DEVELOPER";
+        else if (str.includes("DESIGN") || str.includes("GRAPHIC") || str.includes("VISUAL")) cat = "DESIGNER";
+        else if (str.includes("QA") || str.includes("TEST") || str.includes("QUALITY")) cat = "QA";
+        else if (str.includes("PM") || str.includes("MANAGER")) cat = "PM";
+        return {
+          ...u,
+          roleCategory: cat,
+          dailyHours: 7,
+        };
+      });
     const pmUser = activeUsers.find((u) => getUserId(u) === String(projectManagerId));
     const selectedExistingProject = availableCompanyProjects.find((p) => String(p._id) === String(projectId));
     const finalProjectName = isCreatingNewProject
@@ -428,7 +512,8 @@ export default function ProjectPlanSetupModal({
       newProjectName: isCreatingNewProject ? newProjectName.trim() : null,
       newProjectCode: isCreatingNewProject ? (newProjectCode.trim() || generateCodeForCompany(companyId)) : null,
       clientName: clientName.trim(),
-      projectType,
+      projectType: projectTypes.join(", "),
+      projectTypes,
       complexity,
       startPhaseId,
       startDate,
@@ -622,7 +707,7 @@ export default function ProjectPlanSetupModal({
             </div>
           </div>
 
-          {/* ROW 2: CLIENT NAME & PROJECT TYPE */}
+          {/* ROW 2: CLIENT NAME & PROJECT DELIVERABLE TYPES (MULTI-SELECT) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-700">
@@ -638,19 +723,58 @@ export default function ProjectPlanSetupModal({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                Project Type (Workflow Template)
-              </label>
-              <select
-                value={projectType}
-                onChange={(e) => setProjectType(e.target.value)}
-                className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-xs font-medium text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="storyline-360">Storyline 360 Course</option>
-                <option value="rise-360">Rise 360 Course</option>
-                <option value="mp4-video">MP4 Video Output</option>
-                <option value="pdf-graphic">PDF/Graphic Output</option>
-              </select>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-700">
+                  Project Deliverables (Multi-Select)
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllProjectTypes}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-gray-300 text-xs">•</span>
+                  <button
+                    type="button"
+                    onClick={handleResetProjectTypes}
+                    className="text-[11px] font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Multi-Select Cards */}
+              <div className="grid grid-cols-2 gap-2">
+                {PROJECT_TYPE_OPTIONS.map((opt) => {
+                  const isSelected = projectTypes.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => toggleProjectType(opt.id)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-left border text-xs transition-all cursor-pointer select-none ${
+                        isSelected
+                          ? "bg-blue-50/80 border-blue-500 text-blue-900 font-semibold shadow-xs ring-1 ring-blue-500/20"
+                          : "bg-gray-50/60 border-gray-200 text-gray-600 hover:bg-gray-100/70 hover:border-gray-300"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors ${
+                          isSelected
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-300 bg-white"
+                        }`}
+                      >
+                        {isSelected && <CheckCircle2 size={12} className="stroke-[3]" />}
+                      </div>
+                      <div className="min-w-0 flex-1 truncate">{opt.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -664,7 +788,7 @@ export default function ProjectPlanSetupModal({
                 {onOpenComplexityAdjuster && (
                   <button
                     type="button"
-                    onClick={() => onOpenComplexityAdjuster(projectType)}
+                    onClick={() => onOpenComplexityAdjuster(projectTypes[0] || "storyline-360")}
                     className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline"
                   >
                     <Sliders size={12} />
@@ -679,7 +803,7 @@ export default function ProjectPlanSetupModal({
               >
                 {availableComplexities.map((c) => (
                   <option key={c.id || c.name} value={c.id || c.name}>
-                    {c.name} {c.effortMultiplier ? `(${c.effortMultiplier}x)` : ""}
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -783,7 +907,7 @@ export default function ProjectPlanSetupModal({
                 <span>Parallel Pipelining Across Modules</span>
               </label>
 
-              {projectType === "storyline-360" && (
+              {projectTypes.includes("storyline-360") && (
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-xs text-purple-700 select-none">
                   <input
                     type="checkbox"

@@ -153,9 +153,9 @@ export default function UserCalendar({ auth }) {
       </div>
 
       {/* Calendar Layout */}
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         {/* Main Calendar */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm flex flex-col">
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm flex flex-col min-w-0">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
             <div>
               <h3 className="text-lg font-bold text-slate-900">
@@ -170,109 +170,114 @@ export default function UserCalendar({ auth }) {
 
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0" />
                 <span className="font-semibold text-slate-600">Today</span>
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-500 shrink-0" />
                 <span className="font-semibold text-slate-600">Holiday</span>
               </div>
             </div>
           </div>
 
-          {/* Week Header */}
-          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, idx) => (
-              <div
-                key={d}
-                className={`py-3 text-center text-[11px] font-bold uppercase tracking-wider ${
-                  idx === 0 || idx === 6 ? "text-blue-600 bg-blue-50/30" : "text-slate-500"
-                }`}
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Days */}
-          <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 flex-1">
-            {days.map((day, i) => {
-              if (!day) {
-                return (
+          {/* Scrollable calendar table container preventing horizontal cropping */}
+          <div className="overflow-x-auto w-full">
+            <div className="min-w-[640px] flex flex-col">
+              {/* Week Header */}
+              <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/80">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, idx) => (
                   <div
-                    key={`empty-${i}`}
-                    className="min-h-[105px] bg-slate-50/40"
-                  />
-                );
-              }
+                    key={d}
+                    className={`py-3 text-center text-[11px] font-bold uppercase tracking-wider ${
+                      idx === 0 || idx === 6 ? "text-blue-600 bg-blue-50/30" : "text-slate-500"
+                    }`}
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
 
-              const key = dateKey(day);
-              const holiday = holidayMap[key];
-              const cellDate = new Date(year, month, day);
-              const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+              {/* Days */}
+              <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 flex-1">
+                {days.map((day, i) => {
+                  if (!day) {
+                    return (
+                      <div
+                        key={`empty-${i}`}
+                        className="min-h-[105px] bg-slate-50/40"
+                      />
+                    );
+                  }
 
-              const isToday =
-                day === today.getDate() &&
-                month === today.getMonth() &&
-                year === today.getFullYear();
+                  const key = dateKey(day);
+                  const holiday = holidayMap[key];
+                  const cellDate = new Date(year, month, day);
+                  const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
 
-              const typeConfig = HOLIDAY_TYPES.find(t => t.id === holiday?.type) || HOLIDAY_TYPES[0];
+                  const isToday =
+                    day === today.getDate() &&
+                    month === today.getMonth() &&
+                    year === today.getFullYear();
 
-              return (
-                <div
-                  key={key}
-                  className={`relative min-h-[105px] p-2.5 transition flex flex-col justify-between select-none ${
-                    holiday
-                      ? `${typeConfig.color} shadow-xs`
-                      : isWeekend
-                      ? "bg-slate-50/50 hover:bg-slate-100/50"
-                      : "bg-white hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition ${
-                        isToday
-                          ? "bg-blue-600 text-white shadow-sm"
-                          : holiday
-                          ? "bg-white/90 font-extrabold shadow-xs text-slate-900"
+                  const typeConfig = HOLIDAY_TYPES.find(t => t.id === holiday?.type) || HOLIDAY_TYPES[0];
+
+                  return (
+                    <div
+                      key={key}
+                      className={`relative min-h-[105px] p-2.5 transition flex flex-col justify-between select-none min-w-0 ${
+                        holiday
+                          ? `${typeConfig.color} shadow-xs`
                           : isWeekend
-                          ? "text-slate-400 font-semibold"
-                          : "text-slate-700 font-semibold"
+                          ? "bg-slate-50/50 hover:bg-slate-100/50"
+                          : "bg-white hover:bg-slate-50"
                       }`}
                     >
-                      {day}
-                    </span>
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition ${
+                            isToday
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : holiday
+                              ? "bg-white/90 font-extrabold shadow-xs text-slate-900"
+                              : isWeekend
+                              ? "text-slate-400 font-semibold"
+                              : "text-slate-700 font-semibold"
+                          }`}
+                        >
+                          {day}
+                        </span>
 
-                    {holiday && (
-                      <span className={`h-2 w-2 rounded-full ${typeConfig.badge}`} />
-                    )}
-                  </div>
+                        {holiday && (
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${typeConfig.badge}`} />
+                        )}
+                      </div>
 
-                  {holiday ? (
-                    <div className="mt-1.5 rounded-xl bg-white/95 p-1.5 shadow-xs border border-slate-200/80 flex flex-col gap-0.5">
-                      <div className="text-[11px] font-bold text-slate-900 truncate" title={holiday.name}>
-                        {holiday.name}
-                      </div>
-                      <div className="flex items-center justify-between text-[9px] font-medium text-slate-500">
-                        <span className="capitalize">{holiday.type || "Company"}</span>
-                        <span className="text-blue-600 font-semibold">Off</span>
-                      </div>
+                      {holiday ? (
+                        <div className="mt-1.5 rounded-xl bg-white/95 p-1.5 shadow-xs border border-slate-200/80 flex flex-col gap-0.5 min-w-0 overflow-hidden">
+                          <div className="text-[11px] font-bold text-slate-900 truncate" title={holiday.name}>
+                            {holiday.name}
+                          </div>
+                          <div className="flex items-center justify-between text-[9px] font-medium text-slate-500 gap-1">
+                            <span className="capitalize truncate">{holiday.type || "Company"}</span>
+                            <span className="text-blue-600 font-semibold shrink-0">Off</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-[10px] text-slate-300 font-medium truncate">
+                          {isWeekend ? "Weekend" : "Work day"}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="mt-2 text-[10px] text-slate-300 font-medium">
-                      {isWeekend ? "Weekend" : "Work day"}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Right Panel */}
-        <aside className="space-y-4">
+        <aside className="space-y-4 min-w-0">
           {/* Holidays */}
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

@@ -418,7 +418,7 @@ export default function Admin({ auth, onLogout }) {
         {/* RIGHT CONTENT */}
         <main className="flex-1 overflow-y-auto bg-slate-50 p-3">
 
-          <div className="mx-auto space-y-3">
+          <div className="w-full max-w-full space-y-3">
 
             {tab === "companies" && (
               <Companies auth={auth} />
@@ -452,7 +452,7 @@ export default function Admin({ auth, onLogout }) {
             )}
 
             {tab === "dailyReport" && (
-              <AdminDailyReport auth={auth} />
+              <AdminDailyReport auth={auth} externalPausedCount={pausedAlertsCount} />
             )}
 
             {tab === "manualTasks" && (

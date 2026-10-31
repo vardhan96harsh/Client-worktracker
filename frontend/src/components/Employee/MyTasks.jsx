@@ -173,11 +173,18 @@ export default function MyTasks({ auth, onStartTaskTimer }) {
               <ListTodo className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                My Assigned Tasks
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                  My Assigned Tasks
+                </h2>
+                {auth?.user?.designation && (
+                  <span className="rounded-full bg-blue-50 border border-blue-200 text-blue-700 px-2.5 py-0.5 text-xs font-bold">
+                    Role: {auth.user.designation}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tasks assigned to you across all project plans. Click to start your timer or update status.
+                Tasks assigned to you strictly for your role ({auth?.user?.designation || "Specialist"}). Click to start your timer or update status.
               </p>
             </div>
           </div>

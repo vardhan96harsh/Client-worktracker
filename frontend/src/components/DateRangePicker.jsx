@@ -18,6 +18,7 @@ function parseISOish(s) {
 
 export default function DateRangePicker({ from, to, onChange, className = "" }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const pickerRef = useRef(null);
 
   const selected = useMemo(() => ({
@@ -37,6 +38,19 @@ export default function DateRangePicker({ from, to, onChange, className = "" }) 
     });
     setOpen(false);
   }
+
+  // Check boundary to prevent popup from getting cropped at the right screen edge
+  useEffect(() => {
+    if (open && pickerRef.current) {
+      const rect = pickerRef.current.getBoundingClientRect();
+      const popupWidth = 340;
+      if (rect.left + popupWidth > window.innerWidth - 16) {
+        setAlignRight(true);
+      } else {
+        setAlignRight(false);
+      }
+    }
+  }, [open]);
 
   // Close popup when clicking outside
   useEffect(() => {
@@ -61,7 +75,7 @@ export default function DateRangePicker({ from, to, onChange, className = "" }) 
 
       {open && (
         <div
-          className="absolute left-0 top-full z-50 mt-2 rounded-2xl border border-slate-200 bg-white shadow-2xl p-3"
+          className={`absolute ${alignRight ? "right-0" : "left-0"} top-full z-50 mt-2 rounded-2xl border border-slate-200 bg-white shadow-2xl p-3 max-w-[calc(100vw-2rem)]`}
           style={{ width: 330 }}
         >
           <DayPicker

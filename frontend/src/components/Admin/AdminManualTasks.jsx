@@ -59,7 +59,7 @@ export default function AdminManualTasks({ auth }) {
       try {
         const list = await api("/api/users?status=active", { token: auth.token });
         const sorted = (list || [])
-          .filter((u) => u.role !== "admin" && u.status !== "inactive")
+          .filter((u) => u.role === "employee" && u.status !== "inactive")
           .sort((a, b) =>
             (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
           );

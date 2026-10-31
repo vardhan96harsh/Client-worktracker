@@ -29,7 +29,7 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 
-export default function WorkTimer({ auth, initialSelectedTask }) {
+export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTask }) {
   // ---------------- STATES ----------------
   const [companies, setCompanies] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -176,29 +176,29 @@ export default function WorkTimer({ auth, initialSelectedTask }) {
   }
 
   // ---- loaders ----
-async function loadMaster() {
-  setError("");
+  async function loadMaster() {
+    setError("");
 
-  try {
-    const [c, g] = await Promise.all([
-      api("/api/companies", { token: auth.token }),
-      api("/api/categories", { token: auth.token }),
-    ]);
+    try {
+      const [c, g] = await Promise.all([
+        api("/api/companies", { token: auth.token }),
+        api("/api/categories", { token: auth.token }),
+      ]);
 
-    // Company names in alphabetical order A-Z
-    setCompanies(
-      [...(c || [])].sort((a, b) =>
-        (a.name || "").localeCompare(b.name || "", undefined, {
-          sensitivity: "base",
-        }),
-      ),
-    );
+      // Company names in alphabetical order A-Z
+      setCompanies(
+        [...(c || [])].sort((a, b) =>
+          (a.name || "").localeCompare(b.name || "", undefined, {
+            sensitivity: "base",
+          }),
+        ),
+      );
 
-    setCategories(g || []);
-  } catch (e) {
-    setError("Could not load master data. Please retry.");
+      setCategories(g || []);
+    } catch (e) {
+      setError("Could not load master data. Please retry.");
+    }
   }
-}
 
   async function loadProjects() {
     setError("");
@@ -541,8 +541,9 @@ async function loadMaster() {
   useEffect(() => {
     if (initialSelectedTask) {
       selectAssignedTask(initialSelectedTask);
+      onClearInitialTask?.();
     }
-  }, [initialSelectedTask, selectAssignedTask]);
+  }, [initialSelectedTask, selectAssignedTask, onClearInitialTask]);
 
 
   useEffect(() => {
@@ -567,16 +568,21 @@ async function loadMaster() {
     };
   }, []);
 
+  const loadSessionsAndTickRef = useRef(loadSessionsAndTick);
+  useEffect(() => {
+    loadSessionsAndTickRef.current = loadSessionsAndTick;
+  });
+
   // 🔄 Periodic auto-sync (every 15s) in background to guarantee WorkTimer and Overlay never desync
   useEffect(() => {
     const syncInterval = setInterval(() => {
       if (!offlineManager.isOffline() && !loadingSessionsRef.current) {
-        loadSessionsAndTick({ isBackground: true });
+        loadSessionsAndTickRef.current?.({ isBackground: true });
       }
     }, 15000);
 
     return () => clearInterval(syncInterval);
-  }, [dateFilter, range.from, range.to]);
+  }, []);
 
   // System sleep/idle handlers
   useEffect(() => {
@@ -586,11 +592,12 @@ async function loadMaster() {
 
       autoPausedRef.current = true;
       localStorage.setItem("wt_auto_paused", "1");
+      localStorage.removeItem("wt_manual_paused");
 
       clearTicker();
       setElapsed((prev) => prev);
 
-      pause();
+      pause(true); // isAuto = true
     };
 
     const off = window.worktracker?.onSystemSleep?.(handler);
@@ -612,8 +619,12 @@ async function loadMaster() {
         return;
       }
 
-      autoPausedRef.current = false;
-      autoResumeOnActivity("system:wake");
+      // If manually paused by user, NEVER auto-resume on wake!
+      if (localStorage.getItem("wt_manual_paused") === "1") return;
+
+      if (localStorage.getItem("wt_auto_paused") === "1" || autoPausedRef.current) {
+        autoResumeOnActivity("system:wake");
+      }
     };
 
     const off = window.worktracker?.onSystemWake?.(handler);
@@ -625,53 +636,53 @@ async function loadMaster() {
       const cur = activeSessionRef.current;
       if (!cur || cur.status !== "active") return;
 
+      autoPausedRef.current = true;
       localStorage.setItem("wt_idle_paused", "1");
+      localStorage.removeItem("wt_manual_paused");
 
       clearTicker();
       setElapsed((prev) => prev);
 
-      pause(true); // isAuto = true (0s cooldown)
+      pause(true); // isAuto = true
     };
 
     const off = window.worktracker?.onSystemIdle?.(handler);
     return () => typeof off === "function" && off();
   }, []);
 
-  // 🖱️ Automatic resume on user activity (mouse movement, keypress, click, scroll) when paused
+  // 🖱️ Automatic resume after 15-second grace period on user activity (mouse movement, keypress, click, scroll)
   const autoResumeOnActivity = useCallback((source = "user") => {
     const todayStr = getLocalDateStr(new Date());
-    let cur = activeSessionRef.current || activeSession;
+    let cur = activeSessionRef.current;
     if (cur?.date && cur.date !== todayStr) {
       setActiveSession(null);
       activeSessionRef.current = null;
       clearTicker();
       setElapsed(0);
-      cur = null;
+      return;
     }
 
-    if (!cur || cur.status !== "paused") {
-      const pausedInList = (sessionsRef.current || []).find((s) => s.status === "paused" && s.date === todayStr);
-      if (pausedInList) {
-        cur = pausedInList;
-        activeSessionRef.current = pausedInList;
-        setActiveSession(pausedInList);
-      }
-    }
-
+    // 🔒 1. STRICT: Only resume if the current session is PAUSED today!
+    // NEVER search or resurrect other arbitrary sessions from the list!
     const isPaused = cur?.status === "paused" && cur?.date === todayStr;
     if (!isPaused) return;
 
-    // Grace period right after manual pausing (prevent click release from instantly un-pausing)
-    if (Date.now() < pauseCooldownRef.current) return;
+    // 🔒 2. 15-second protected grace period: prevents click/release from accidentally resuming immediately
+    const cooldown = Math.max(
+      pauseCooldownRef.current || 0,
+      Number(localStorage.getItem("wt_pause_cooldown")) || 0
+    );
+    if (Date.now() < cooldown) return;
 
     if (resumeInProgressRef.current) return;
 
     localStorage.removeItem("wt_auto_paused");
     localStorage.removeItem("wt_idle_paused");
+    localStorage.removeItem("wt_pause_cooldown");
+    localStorage.removeItem("wt_paused_session_id");
     autoPausedRef.current = false;
 
     resumeInProgressRef.current = true;
-    // Watchdog timer: ensure lock is never permanently stuck if network hangs
     const watchdog = setTimeout(() => {
       resumeInProgressRef.current = false;
     }, 4000);
@@ -680,32 +691,35 @@ async function loadMaster() {
       clearTimeout(watchdog);
       resumeInProgressRef.current = false;
     });
-  }, [activeSession]);
+  }, []);
 
   useEffect(() => {
     let lastCheck = 0;
     let anchorPos = null;
 
     const activityHandler = (e) => {
-      const cur = activeSessionRef.current || activeSession;
-      const isPaused = cur?.status === "paused" || (sessionsRef.current || []).some((s) => s.status === "paused");
-      if (!isPaused) return;
+      const cur = activeSessionRef.current;
+      if (!cur || cur.status !== "paused") return;
 
-      if (Date.now() < pauseCooldownRef.current) return;
+      const cooldown = Math.max(
+        pauseCooldownRef.current || 0,
+        Number(localStorage.getItem("wt_pause_cooldown")) || 0
+      );
+      if (Date.now() < cooldown) return;
 
-      // For mouse move, require real movement of at least 5px from anchor to filter optical sensor micro-jitter
+      // Filter optical sensor micro-jitter (require at least 8px movement)
       if (e && e.type === "mousemove") {
         if (!anchorPos) {
           anchorPos = { x: e.clientX, y: e.clientY };
           return;
         }
         const dist = Math.hypot(e.clientX - anchorPos.x, e.clientY - anchorPos.y);
-        if (dist < 5) return;
+        if (dist < 8) return;
         anchorPos = { x: e.clientX, y: e.clientY };
       }
 
       const now = Date.now();
-      if (now - lastCheck < 400) return;
+      if (now - lastCheck < 500) return;
       lastCheck = now;
 
       autoResumeOnActivity(e?.type || "user");
@@ -715,16 +729,8 @@ async function loadMaster() {
     window.addEventListener("keydown", activityHandler, { passive: true });
     window.addEventListener("mousedown", activityHandler, { passive: true });
     window.addEventListener("wheel", activityHandler, { passive: true });
-    window.addEventListener("focus", () => autoResumeOnActivity("window:focus"));
 
-    const handleVisChange = () => {
-      if (document.visibilityState === "visible") {
-        autoResumeOnActivity("window:visible");
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisChange);
-
-    // Also listen to system-level active, wake, and user-activity from Electron
+    // Also listen to system-level active (waking from 5-min idle), user-activity, and wake
     const offActive = window.worktracker?.onSystemActive?.(() => autoResumeOnActivity("system:active"));
     const offActivity = window.worktracker?.onUserActivity?.(() => autoResumeOnActivity("system:user-activity"));
     const offWake = window.worktracker?.onSystemWake?.(() => autoResumeOnActivity("system:wake"));
@@ -734,14 +740,11 @@ async function loadMaster() {
       window.removeEventListener("keydown", activityHandler);
       window.removeEventListener("mousedown", activityHandler);
       window.removeEventListener("wheel", activityHandler);
-      window.removeEventListener("focus", () => autoResumeOnActivity("window:focus"));
-      document.removeEventListener("visibilitychange", handleVisChange);
       if (typeof offActive === "function") offActive();
       if (typeof offActivity === "function") offActivity();
       if (typeof offWake === "function") offWake();
     };
-  }, [autoResumeOnActivity, activeSession]);
-
+  }, [autoResumeOnActivity]);
   useEffect(() => {
     const off = window.worktracker?.onAppClosing?.(() => {
       // ❌ DO NOT auto-stop session here
@@ -823,6 +826,12 @@ async function loadMaster() {
   // ---- actions ----
   async function start() {
     setError("");
+    pauseCooldownRef.current = 0;
+    localStorage.removeItem("wt_pause_cooldown");
+    localStorage.removeItem("wt_paused_session_id");
+    localStorage.removeItem("wt_auto_paused");
+    localStorage.removeItem("wt_idle_paused");
+    autoPausedRef.current = false;
 
     // NEW VALIDATION
     if (mode === "project" && !projectId) {
@@ -948,12 +957,18 @@ async function loadMaster() {
   }
 
   async function pause(isAuto = false) {
+    const autoTriggered = isAuto === true;
     return enqueueSessionOp(async () => {
       setError("");
-      // Cooldown is only needed for manual mouse click on Pause button (1s), 0s for auto-pause
-      pauseCooldownRef.current = isAuto ? 0 : Date.now() + 1000;
+      // ⏱️ 15-second grace period: user can safely pause and move mouse without resuming immediately
+      const cooldownUntil = Date.now() + 15000;
+      pauseCooldownRef.current = cooldownUntil;
+      localStorage.setItem("wt_pause_cooldown", String(cooldownUntil));
 
       const cur = activeSessionRef.current || activeSession;
+      if (cur?._id) {
+        localStorage.setItem("wt_paused_session_id", String(cur._id));
+      }
       if (!cur) return;
 
       // ⚡ INSTANT OPTIMISTIC PAUSE (0ms UI latency)
@@ -1017,8 +1032,16 @@ async function loadMaster() {
     return enqueueSessionOp(async () => {
       setError("");
       pauseCooldownRef.current = 0;
+      localStorage.removeItem("wt_pause_cooldown");
+      localStorage.removeItem("wt_paused_session_id");
+      localStorage.removeItem("wt_auto_paused");
+      localStorage.removeItem("wt_idle_paused");
+      autoPausedRef.current = false;
+
       const todayStr = getLocalDateStr(new Date());
-      let cur = activeSessionRef.current || activeSession || (sessionsRef.current || []).find((s) => s.status === "paused" && s.date === todayStr);
+      // 🔒 STRICT: Only resume the current session, never resurrect random past sessions!
+      let cur = activeSessionRef.current || activeSession;
+      if (!cur || cur.date !== todayStr) return;
 
       // ⚡ INSTANT OPTIMISTIC RESUME (0ms UI latency)
       if (cur) {
@@ -1083,6 +1106,13 @@ async function loadMaster() {
 
   async function stop() {
     setError("");
+    pauseCooldownRef.current = 0;
+    localStorage.removeItem("wt_pause_cooldown");
+    localStorage.removeItem("wt_paused_session_id");
+    localStorage.removeItem("wt_manual_paused");
+    localStorage.removeItem("wt_auto_paused");
+    localStorage.removeItem("wt_idle_paused");
+    autoPausedRef.current = false;
     const cur = activeSessionRef.current || activeSession;
     const targetSessionId = cur?._id;
 
@@ -1123,7 +1153,7 @@ async function loadMaster() {
       // 🌐 OFFLINE FALLBACK: Stop session in local cache
       if (e?.isOffline || !navigator.onLine || e?.status === 0) {
         console.log("🌐 Network offline -> stopping session in local cache");
-        const stoppedSess = offlineManager.stopOfflineSession(stopRemarks.trim(), cur);
+        const stoppedSess = offlineManager.stopOfflineSession("", cur);
         if (stoppedSess) {
           clearTicker();
           setActiveSession(null);
@@ -1469,7 +1499,10 @@ async function loadMaster() {
             </div>
             <button
               type="button"
-              onClick={() => setAssignedTaskInfo(null)}
+              onClick={() => {
+                setAssignedTaskInfo(null);
+                onClearInitialTask?.();
+              }}
               className="text-[11px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer ml-2"
             >
               Clear
@@ -1719,7 +1752,7 @@ async function loadMaster() {
             {hasRunning ? (
               <button
                 type="button"
-                onClick={pause}
+                onClick={() => pause(false)}
                 className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-[0.98] text-slate-950 font-bold px-7 py-3 text-xs shadow-lg shadow-amber-500/25 transition-all cursor-pointer"
               >
                 <Pause size={16} className="fill-current" />

@@ -45,7 +45,12 @@ export default function PlansDashboard({
   // Filter plans
   const filteredPlans = useMemo(() => {
     return plans.filter((p) => {
-      if (typeFilter !== "ALL" && p.projectType !== typeFilter) return false;
+      if (typeFilter !== "ALL") {
+        const types = Array.isArray(p.projectTypes) && p.projectTypes.length > 0
+          ? p.projectTypes
+          : (p.projectType ? p.projectType.split(",").map((s) => s.trim()) : []);
+        if (!types.includes(typeFilter) && p.projectType !== typeFilter) return false;
+      }
       if (complexityFilter !== "ALL" && p.complexity !== complexityFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -76,15 +81,23 @@ export default function PlansDashboard({
         p.actualUsedEffortHours !== undefined && p.actualUsedEffortHours !== null && p.actualUsedEffortHours > 0
           ? Number(p.actualUsedEffortHours)
           : (p.tasks || [])
-              .filter((t) => t.status === "Completed")
-              .reduce((s, t) => s + (t.actualUsedHours || t.hours || 0), 0);
+            .filter((t) => t.status === "Completed")
+            .reduce((s, t) => s + (t.actualUsedHours || t.hours || 0), 0);
       return sum + act;
     }, 0)
     .toFixed(0);
 
   // Collect unique project types and complexities for filters
   const uniqueTypes = useMemo(() => {
-    return Array.from(new Set(plans.map((p) => p.projectType).filter(Boolean)));
+    const set = new Set();
+    plans.forEach((p) => {
+      if (Array.isArray(p.projectTypes) && p.projectTypes.length > 0) {
+        p.projectTypes.forEach((t) => set.add(t));
+      } else if (p.projectType) {
+        p.projectType.split(",").forEach((t) => set.add(t.trim()));
+      }
+    });
+    return Array.from(set).filter(Boolean);
   }, [plans]);
 
   const uniqueComplexities = useMemo(() => {
@@ -307,11 +320,11 @@ export default function PlansDashboard({
               plan.actualUsedEffortHours !== undefined && plan.actualUsedEffortHours !== null && plan.actualUsedEffortHours > 0
                 ? Number(plan.actualUsedEffortHours)
                 : Number(
-                    (plan.tasks || [])
-                      .filter((t) => t.status === "Completed")
-                      .reduce((sum, t) => sum + (t.actualUsedHours || t.hours || 0), 0)
-                      .toFixed(1)
-                  ) || 0;
+                  (plan.tasks || [])
+                    .filter((t) => t.status === "Completed")
+                    .reduce((sum, t) => sum + (t.actualUsedHours || t.hours || 0), 0)
+                    .toFixed(1)
+                ) || 0;
             const completedCount = (plan.tasks || []).filter((t) => t.status === "Completed").length;
             const totalTasks = (plan.tasks || []).length;
             const progress = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
@@ -337,9 +350,19 @@ export default function PlansDashboard({
                           Starts: {plan.startPhaseName.split("—")[1] || plan.startPhaseName}
                         </span>
                       )}
-                      <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-[10px] font-bold text-blue-700">
-                        {plan.projectType}
-                      </span>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {(Array.isArray(plan.projectTypes) && plan.projectTypes.length > 0
+                          ? plan.projectTypes
+                          : (plan.projectType ? plan.projectType.split(",").map((s) => s.trim()) : ["storyline-360"])
+                        ).map((pt) => (
+                          <span
+                            key={pt}
+                            className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700"
+                          >
+                            {pt}
+                          </span>
+                        ))}
+                      </div>
                       <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                         {plan.complexity}
                       </span>

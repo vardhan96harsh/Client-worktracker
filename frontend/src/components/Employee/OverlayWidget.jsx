@@ -469,7 +469,7 @@ function EmployeeOverlayWidget({ auth }) {
     });
   }, []);
 
-  // 🖱️ Automatic resume on user activity (mouse move, keypress, click, scroll) when paused
+  // 🖱️ Automatic resume after 15-second grace period on user activity (mouse movement, keypress, click, scroll)
   const handleUserActivity = (e) => {
     const todayStr = getTodayYMD();
     let cur = activeSessionRef.current || activeSession;
@@ -478,28 +478,28 @@ function EmployeeOverlayWidget({ auth }) {
       activeSessionRef.current = null;
       clearTicker();
       setElapsed(0);
-      cur = null;
+      return;
     }
 
-    if (!cur || cur.status !== "paused") {
-      const pausedInList = (sessionsRef.current || []).find((s) => s.status === "paused" && s.date === todayStr);
-      if (pausedInList) {
-        cur = pausedInList;
-        activeSessionRef.current = pausedInList;
-        setActiveSession(pausedInList);
-      }
-    }
-
+    // 🔒 1. STRICT: Only resume if currently paused today!
+    // NEVER search or resurrect other arbitrary sessions from the list!
     if (!cur || cur.status !== "paused" || cur.date !== todayStr) return;
-    if (Date.now() < pauseCooldownRef.current) return;
 
+    // 🔒 2. 15-second protected grace period
+    const cooldown = Math.max(
+      pauseCooldownRef.current || 0,
+      Number(localStorage.getItem("wt_pause_cooldown")) || 0
+    );
+    if (Date.now() < cooldown) return;
+
+    // Filter optical sensor micro-jitter (require at least 8px movement)
     if (e && e.type === "mousemove") {
       if (!lastMousePosRef.current.initialized) {
         lastMousePosRef.current = { x: e.clientX, y: e.clientY, initialized: true };
         return;
       }
       const dist = Math.hypot(e.clientX - lastMousePosRef.current.x, e.clientY - lastMousePosRef.current.y);
-      if (dist < 5) return;
+      if (dist < 8) return;
       lastMousePosRef.current = { x: e.clientX, y: e.clientY, initialized: true };
     }
 
@@ -508,6 +508,11 @@ function EmployeeOverlayWidget({ auth }) {
     const watchdog = setTimeout(() => {
       resumeInProgressRef.current = false;
     }, 4000);
+
+    localStorage.removeItem("wt_pause_cooldown");
+    localStorage.removeItem("wt_paused_session_id");
+    localStorage.removeItem("wt_auto_paused");
+    localStorage.removeItem("wt_idle_paused");
 
     doResume().finally(() => {
       clearTimeout(watchdog);
@@ -525,8 +530,8 @@ function EmployeeOverlayWidget({ auth }) {
     window.addEventListener("keydown", onKey, { passive: true });
     window.addEventListener("mousedown", onClick, { passive: true });
     window.addEventListener("wheel", onWheel, { passive: true });
-    window.addEventListener("focus", () => handleUserActivity({ type: "focus" }));
 
+    // Also listen to system-level active (waking from 5-min idle), user-activity, and wake
     const offActive = window.worktracker?.onSystemActive?.(handleUserActivity);
     const offActivity = window.worktracker?.onUserActivity?.(handleUserActivity);
     const offWake = window.worktracker?.onSystemWake?.(handleUserActivity);
@@ -536,16 +541,19 @@ function EmployeeOverlayWidget({ auth }) {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("mousedown", onClick);
       window.removeEventListener("wheel", onWheel);
-      window.removeEventListener("focus", () => handleUserActivity({ type: "focus" }));
       if (typeof offActive === "function") offActive();
       if (typeof offActivity === "function") offActivity();
       if (typeof offWake === "function") offWake();
     };
   }, []);
-
   // ---------- actions (manual buttons) with offline fallbacks ----------
   async function doStart() {
     return enqueueSessionOp(async () => {
+      pauseCooldownRef.current = 0;
+      localStorage.removeItem("wt_pause_cooldown");
+      localStorage.removeItem("wt_paused_session_id");
+      localStorage.removeItem("wt_auto_paused");
+      localStorage.removeItem("wt_idle_paused");
       const lastProjectId = localStorage.getItem("lastProjectId");
       if (!lastProjectId) {
         setError("Choose project in main app first");
@@ -614,8 +622,13 @@ function EmployeeOverlayWidget({ auth }) {
 
   async function doPause() {
     return enqueueSessionOp(async () => {
-      pauseCooldownRef.current = Date.now() + 2000; // 2s cooldown so clicking pause doesn't immediately auto-resume
+      const cooldownUntil = Date.now() + 15000; // 15-second grace period
+      pauseCooldownRef.current = cooldownUntil;
+      localStorage.setItem("wt_pause_cooldown", String(cooldownUntil));
       const cur = activeSessionRef.current || activeSession;
+      if (cur?._id) {
+        localStorage.setItem("wt_paused_session_id", String(cur._id));
+      }
       if (!cur || cur.status !== "active") return;
 
       const additionalMins = cur.currentStart
@@ -659,12 +672,14 @@ function EmployeeOverlayWidget({ auth }) {
   async function doResume() {
     return enqueueSessionOp(async () => {
       pauseCooldownRef.current = 0;
+      localStorage.removeItem("wt_pause_cooldown");
+      localStorage.removeItem("wt_paused_session_id");
+      localStorage.removeItem("wt_auto_paused");
+      localStorage.removeItem("wt_idle_paused");
       let cur = activeSessionRef.current || activeSession;
       const todayStr = getTodayYMD();
-      if (!cur) {
-        cur = (sessionsRef.current || []).find((s) => s.status === "paused" && s.date === todayStr);
-      }
-      if (!cur) return;
+      // 🔒 STRICT: Never resurrect arbitrary past sessions!
+      if (!cur || cur.date !== todayStr) return;
 
       const resumedSess = {
         ...cur,
@@ -708,6 +723,12 @@ function EmployeeOverlayWidget({ auth }) {
 
   async function doStop() {
     return enqueueSessionOp(async () => {
+      pauseCooldownRef.current = 0;
+      localStorage.removeItem("wt_pause_cooldown");
+      localStorage.removeItem("wt_paused_session_id");
+      localStorage.removeItem("wt_manual_paused");
+      localStorage.removeItem("wt_auto_paused");
+      localStorage.removeItem("wt_idle_paused");
       const cur = activeSessionRef.current || activeSession;
       actionLockRef.current = { type: "stop", sessionId: cur?._id };
       clearTicker();

@@ -162,7 +162,7 @@ export default function App() {
 
   const isPausePopup =
     typeof window !== "undefined" &&
-    window.location.hash.includes("/pause-popup");
+    window.location.hash.includes("pause-popup");
 
   if (isPausePopup)
     return (

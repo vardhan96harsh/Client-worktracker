@@ -19,7 +19,7 @@ import UserHoursTable from "./DailyReport/UserHoursTable.jsx";
 import PausedSessionsReport from "./DailyReport/PausedSessionsReport.jsx";
 import LiveUserStatusReport from "./DailyReport/LiveUserStatusReport.jsx";
 
-export default function AdminDailyReport({ auth }) {
+export default function AdminDailyReport({ auth, externalPausedCount }) {
   /* ---------- state ---------- */
   const [{ from, to }, setRange] = useState(() => {
     const today = getLocalDateStr(new Date());
@@ -66,6 +66,12 @@ export default function AdminDailyReport({ auth }) {
   }
 
   /* ---------- paused alerts count polling ---------- */
+  useEffect(() => {
+    if (typeof externalPausedCount === "number") {
+      setPausedCount(externalPausedCount);
+    }
+  }, [externalPausedCount]);
+
   const checkPausedCount = useCallback(async () => {
     if (!auth?.token) return;
     try {
@@ -81,10 +87,12 @@ export default function AdminDailyReport({ auth }) {
   }, [auth?.token]);
 
   useEffect(() => {
+    // If parent provides externalPausedCount, don't duplicate polling!
+    if (typeof externalPausedCount === "number") return;
     checkPausedCount();
     const interval = setInterval(checkPausedCount, 25000);
     return () => clearInterval(interval);
-  }, [checkPausedCount]);
+  }, [checkPausedCount, externalPausedCount]);
 
   /* ---------- live employee status count polling ---------- */
   const checkLiveStatusCount = useCallback(async () => {
@@ -110,19 +118,23 @@ export default function AdminDailyReport({ auth }) {
 
   /* ---------- masters ---------- */
   async function loadMasters() {
-    const [c, g, u] = await Promise.all([
-      api("/api/companies", { token: auth.token }),
-      api("/api/categories", { token: auth.token }),
-      api("/api/users?status=active", { token: auth.token }),
-    ]);
-    setCompanies(c || []);
-    setCategories(g || []);
-    setUsers(
-      (u || [])
-        .filter((x) => x.role !== "admin" && x.status !== "inactive")
-        .map((x) => ({ ...x, _id: x._id ?? x.id }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    );
+    try {
+      const [c, g, u] = await Promise.all([
+        api("/api/companies", { token: auth.token }),
+        api("/api/categories", { token: auth.token }),
+        api("/api/users?status=active", { token: auth.token }),
+      ]);
+      setCompanies(c || []);
+      setCategories(g || []);
+      setUsers(
+        (u || [])
+          .filter((x) => x.role === "employee" && x.status !== "inactive")
+          .map((x) => ({ ...x, _id: x._id ?? x.id }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    } catch (err) {
+      console.error("Failed to load masters:", err);
+    }
   }
 
   async function loadMachines() {

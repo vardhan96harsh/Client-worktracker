@@ -4,6 +4,22 @@
 
 ---
 
+## [Version 2026.10.24] — 23 October 2026 (In-App Floating Pause Alerts & Native Windows Notifications)
+
+### 🚀 Highlights & Release Summary
+1. **In-App Floating Pause Notification Card**:
+   - Restored and polished the floating notification card in `AdminPausedSessionNotifier.jsx` with active employee details, duration, mute toggle, and direct report navigation.
+   - Fixed condition where notifications failed to render inside the desktop app.
+
+2. **Native Windows OS Desktop Notifications**:
+   - Added native Electron `Notification` API support in `main.mjs`, triggering Windows Action Center toasts when sessions are paused.
+   - Fixed packaged ASAR hash routing using `loadFile(indexPath, { hash: "pause-popup" })`.
+
+3. **Gantt Chart Scroll Stability**:
+   - Unified vertical scrolling and replaced dynamic tooltip layout shifts with permanent status bar to eliminate blinking.
+
+---
+
 ## [Version 2026.10.23] — 23 October 2026 (Project Planner Payload Compaction, 50MB Limit & Installer Packaging)
 
 ### 🚀 Highlights & Release Summary

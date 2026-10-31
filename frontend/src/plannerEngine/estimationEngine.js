@@ -9,8 +9,106 @@ import { DEFAULT_COMPLEXITY_CONFIG, PROJECT_TYPE_COMPLEXITIES } from './complexi
 export class EstimationEngine {
   /**
    * Computes the project-wide and per-module hours breakdown based on project parameters.
+   * Supports both single projectType (string) and multi-select projectTypes (array or comma-delimited string).
    */
   static calculateBreakdown({
+    projectType = 'storyline-360',
+    projectTypes = null,
+    courseLengthMinutes = 60,
+    moduleCount = 4,
+    complexity = 'Level 2',
+    complexityConfig = DEFAULT_COMPLEXITY_CONFIG
+  }) {
+    const effectiveTypes = (Array.isArray(projectTypes) && projectTypes.length > 0)
+      ? projectTypes
+      : typeof projectType === 'string' && projectType.includes(',')
+      ? projectType.split(',').map((s) => s.trim()).filter(Boolean)
+      : [projectType || 'storyline-360'];
+
+    if (effectiveTypes.length <= 1) {
+      return this.calculateSingleBreakdown({
+        projectType: effectiveTypes[0] || 'storyline-360',
+        courseLengthMinutes,
+        moduleCount,
+        complexity,
+        complexityConfig
+      });
+    }
+
+    // Consolidated multi-type calculation
+    const breakdowns = effectiveTypes.map((t) =>
+      this.calculateSingleBreakdown({
+        projectType: t,
+        courseLengthMinutes,
+        moduleCount,
+        complexity,
+        complexityConfig
+      })
+    );
+
+    const hoursPerDay = complexityConfig.hoursPerWorkingDay || 7;
+    const totalIdHours = Number(breakdowns.reduce((s, b) => s + b.hours.totalIdHours, 0).toFixed(1));
+    const totalAnimatorHours = Number(breakdowns.reduce((s, b) => s + b.hours.totalAnimatorHours, 0).toFixed(1));
+    const totalDeveloperHours = Number(breakdowns.reduce((s, b) => s + b.hours.totalDeveloperHours, 0).toFixed(1));
+    const totalQaHours = Number(breakdowns.reduce((s, b) => s + b.hours.totalQaHours, 0).toFixed(1));
+    const totalVdHours = Number(breakdowns.reduce((s, b) => s + b.hours.totalVdHours, 0).toFixed(1));
+    const grandTotalHours = Number((totalIdHours + totalAnimatorHours + totalDeveloperHours + totalQaHours + totalVdHours).toFixed(1));
+
+    const numMods = Math.max(1, Number(moduleCount) || 1);
+    const idHoursPerModule = Number((totalIdHours / numMods).toFixed(1));
+    const animatorHoursPerModule = Number((totalAnimatorHours / numMods).toFixed(1));
+    const developerHoursPerModule = Number((totalDeveloperHours / numMods).toFixed(1));
+    const qaHoursPerModule = Number((totalQaHours / numMods).toFixed(1));
+    const vdHoursPerModule = Number((totalVdHours / numMods).toFixed(1));
+
+    const totalMinutes = Math.max(1, Number(courseLengthMinutes) || 60);
+
+    return {
+      projectType: effectiveTypes.join(', '),
+      projectTypes: effectiveTypes,
+      totalMinutes,
+      numModules: numMods,
+      minutesPerModule: totalMinutes / numMods,
+      complexity,
+      complexityName: complexity,
+      effortMultiplier: breakdowns[0]?.effortMultiplier || 1.0,
+      hoursPerDay,
+      ratios: breakdowns[0]?.ratios || { animRatioPercent: 16.67, devRatioPercent: 83.33 },
+      minutes: {
+        totalAnimMinutes: breakdowns.reduce((s, b) => s + b.minutes.totalAnimMinutes, 0),
+        totalDevMinutes: breakdowns.reduce((s, b) => s + b.minutes.totalDevMinutes, 0),
+        animMinutesPerModule: breakdowns.reduce((s, b) => s + b.minutes.animMinutesPerModule, 0),
+        devMinutesPerModule: breakdowns.reduce((s, b) => s + b.minutes.devMinutesPerModule, 0),
+      },
+      hours: {
+        totalIdHours,
+        totalAnimatorHours,
+        totalDeveloperHours,
+        totalQaHours,
+        totalVdHours,
+        grandTotalHours,
+        perModule: {
+          idHours: idHoursPerModule,
+          animatorHours: animatorHoursPerModule,
+          developerHours: developerHoursPerModule,
+          qaHours: qaHoursPerModule,
+          vdHours: vdHoursPerModule,
+        }
+      },
+      workingDays: {
+        idDays: Math.max(1, Math.ceil(totalIdHours / hoursPerDay)),
+        animatorDays: totalAnimatorHours > 0 ? Math.max(1, Math.ceil(totalAnimatorHours / hoursPerDay)) : 0,
+        developerDays: Math.max(1, Math.ceil(totalDeveloperHours / hoursPerDay)),
+        qaDays: Math.max(1, Math.ceil(totalQaHours / hoursPerDay)),
+        vdDays: Math.max(1, Math.ceil(totalVdHours / hoursPerDay)),
+      }
+    };
+  }
+
+  /**
+   * Computes breakdown for a single project type.
+   */
+  static calculateSingleBreakdown({
     projectType = 'storyline-360',
     courseLengthMinutes = 60,
     moduleCount = 4,

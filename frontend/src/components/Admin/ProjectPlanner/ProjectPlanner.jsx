@@ -133,6 +133,9 @@ function sanitizePlanPayload(plan) {
     companyId: plan.companyId || plan.company?._id || plan.company,
     clientName: plan.clientName || "",
     projectType: plan.projectType || "storyline-360",
+    projectTypes: Array.isArray(plan.projectTypes) && plan.projectTypes.length > 0
+      ? plan.projectTypes
+      : (plan.projectType ? plan.projectType.split(",").map((s) => s.trim()).filter(Boolean) : ["storyline-360"]),
     complexity: plan.complexity || "Level 2",
     startPhaseId: plan.startPhaseId || null,
     startPhaseName: plan.startPhaseName || null,
@@ -311,20 +314,31 @@ export default function ProjectPlanner({ auth, onOpenComplexityTab }) {
         projectName: targetProjectName,
         clientName: formData.clientName,
         projectType: formData.projectType,
+        projectTypes: formData.projectTypes,
         complexity: formData.complexity,
         startPhaseId: formData.startPhaseId,
         courseLengthMinutes: formData.courseLengthMinutes,
         moduleCount: formData.moduleCount,
         startDate: formData.startDate,
         projectManager: formData.projectManager,
-        assignedTeam: (formData.assignedTeam || []).map((u) => ({
-          user: u._id || u.id,
-          name: u.name,
-          email: u.email,
-          roleCategory: u.roleCategory || u.designation || "DEVELOPER",
-          designation: u.designation,
-          dailyHours: 7,
-        })),
+        assignedTeam: (formData.assignedTeam || []).map((u) => {
+          const str = String(u.designation || u.roleCategory || "").toUpperCase();
+          let cat = "DEVELOPER";
+          if (str.includes("INSTRUCT") || str.includes("ID") || str.includes("CONTENT") || str.includes("STORYBOARD")) cat = "ID";
+          else if (str.includes("ANIM") || str.includes("MOTION")) cat = "ANIMATOR";
+          else if (str.includes("DEV") || str.includes("AUTHOR") || str.includes("STORYLINE") || str.includes("RISE") || str.includes("SOFTWARE")) cat = "DEVELOPER";
+          else if (str.includes("DESIGN") || str.includes("GRAPHIC") || str.includes("VISUAL")) cat = "DESIGNER";
+          else if (str.includes("QA") || str.includes("TEST") || str.includes("QUALITY")) cat = "QA";
+          else if (str.includes("PM") || str.includes("MANAGER")) cat = "PM";
+          return {
+            user: u._id || u.id,
+            name: u.name,
+            email: u.email,
+            roleCategory: cat,
+            designation: u.designation,
+            dailyHours: 7,
+          };
+        }),
         complexityConfig,
         existingTasks: formData.isEditing ? (currentPlan?.tasks || []) : [],
         includeHld: Boolean(formData.includeHld),
@@ -336,6 +350,7 @@ export default function ProjectPlanner({ auth, onOpenComplexityTab }) {
         companyId: formData.companyId,
         clientName: formData.clientName,
         projectType: formData.projectType,
+        projectTypes: formData.projectTypes,
         complexity: formData.complexity,
         startPhaseId: formData.startPhaseId || generated.startPhaseId,
         startPhaseName: generated.startPhaseName,
