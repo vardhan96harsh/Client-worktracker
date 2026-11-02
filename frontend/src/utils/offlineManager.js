@@ -152,16 +152,32 @@ export const offlineManager = {
     const segs = Array.isArray(session.segments) ? [...session.segments] : [];
 
     if (session.status === "active" && session.currentStart) {
-      segs.push({
-        start: session.currentStart,
-        end: now.toISOString(),
-        manual: false,
-        source: "offline",
-      });
+      let maxClosedEnd = 0;
+      for (const seg of segs) {
+        if (seg.end) {
+          const et = new Date(seg.end).getTime();
+          if (et > maxClosedEnd) maxClosedEnd = et;
+        }
+      }
+      const effectiveStart = Math.max(new Date(session.currentStart).getTime(), maxClosedEnd);
+      if (now.getTime() > effectiveStart) {
+        segs.push({
+          start: new Date(effectiveStart).toISOString(),
+          end: now.toISOString(),
+          manual: false,
+          source: "offline",
+        });
+      }
 
-      const ms = now.getTime() - new Date(session.currentStart).getTime();
-      const mins = ms > 0 ? ms / 60000 : 0;
-      session.accumulatedMinutes = Math.round(((session.accumulatedMinutes || 0) + mins) * 100) / 100;
+      let segMs = 0;
+      for (const seg of segs) {
+        if (seg.start && seg.end) {
+          const st = new Date(seg.start).getTime();
+          const et = new Date(seg.end).getTime();
+          if (et > st) segMs += (et - st);
+        }
+      }
+      session.accumulatedMinutes = Math.min(1440, Math.round((segMs / 60000) * 100) / 100);
       session.totalMinutes = session.accumulatedMinutes;
     }
 
@@ -199,16 +215,32 @@ export const offlineManager = {
     const segs = Array.isArray(session.segments) ? [...session.segments] : [];
 
     if (session.status === "active" && session.currentStart) {
-      segs.push({
-        start: session.currentStart,
-        end: now.toISOString(),
-        manual: false,
-        source: "offline",
-      });
+      let maxClosedEnd = 0;
+      for (const seg of segs) {
+        if (seg.end) {
+          const et = new Date(seg.end).getTime();
+          if (et > maxClosedEnd) maxClosedEnd = et;
+        }
+      }
+      const effectiveStart = Math.max(new Date(session.currentStart).getTime(), maxClosedEnd);
+      if (now.getTime() > effectiveStart) {
+        segs.push({
+          start: new Date(effectiveStart).toISOString(),
+          end: now.toISOString(),
+          manual: false,
+          source: "offline",
+        });
+      }
 
-      const ms = now.getTime() - new Date(session.currentStart).getTime();
-      const mins = ms > 0 ? ms / 60000 : 0;
-      session.accumulatedMinutes = Math.round(((session.accumulatedMinutes || 0) + mins) * 100) / 100;
+      let segMs = 0;
+      for (const seg of segs) {
+        if (seg.start && seg.end) {
+          const st = new Date(seg.start).getTime();
+          const et = new Date(seg.end).getTime();
+          if (et > st) segMs += (et - st);
+        }
+      }
+      session.accumulatedMinutes = Math.min(1440, Math.round((segMs / 60000) * 100) / 100);
       session.totalMinutes = session.accumulatedMinutes;
     }
 
