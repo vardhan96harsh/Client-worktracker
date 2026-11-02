@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { api } from "../../api.js";
+import { api, getSafeNow } from "../../api.js";
 import DateRangePicker from "../../components/DateRangePicker";
 import { offlineManager } from "../../utils/offlineManager.js";
 import {
@@ -129,6 +129,24 @@ export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTas
     elapsedRef.current = elapsed;
   }, [elapsed]);
 
+  // Clock Skew Alert State
+  const [clockSkewMinutes, setClockSkewMinutes] = useState(0);
+
+  useEffect(() => {
+    const handleSkew = (e) => {
+      setClockSkewMinutes(e.detail?.offsetMinutes || 0);
+    };
+    const handleSynced = () => {
+      setClockSkewMinutes(0);
+    };
+    window.addEventListener("system:clock_skew", handleSkew);
+    window.addEventListener("system:clock_synced", handleSynced);
+    return () => {
+      window.removeEventListener("system:clock_skew", handleSkew);
+      window.removeEventListener("system:clock_synced", handleSynced);
+    };
+  }, []);
+
   // Machine Info
   const [machine, setMachine] = useState(null);
   useEffect(() => {
@@ -168,10 +186,12 @@ export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTas
     }
   }
 
-  function getLocalDateStr(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
+  function getLocalDateStr(d) {
+    const target = d || new Date(getSafeNow());
+    const dateObj = typeof target === "string" ? new Date(target) : target;
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
 
@@ -226,11 +246,11 @@ export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTas
     if (session?.status === "active") {
       const baseMs = Math.max(0, (session.accumulatedMinutes || 0) * 60000);
       const start = new Date(
-        session.currentStart || session.createdAt || Date.now()
+        session.currentStart || session.createdAt || getSafeNow()
       ).getTime();
 
       const update = () => {
-        setElapsed(baseMs + Math.max(0, Date.now() - start));
+        setElapsed(baseMs + Math.max(0, getSafeNow() - start));
       };
 
       update();
@@ -1399,6 +1419,30 @@ export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTas
   // ---- UI ----
   return (
     <div className="space-y-4 max-w-[1500px] mx-auto pb-10">
+      {/* Clock Skew Warning Banner */}
+      {clockSkewMinutes !== 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-xs font-medium text-amber-900 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <Clock size={16} />
+            </div>
+            <div>
+              <p className="font-semibold text-amber-950">System Clock Out of Sync</p>
+              <p className="text-amber-800">
+                Your computer's clock differs from the server by <strong>{Math.abs(clockSkewMinutes)} minute{Math.abs(clockSkewMinutes) > 1 ? "s" : ""}</strong>.
+                To prevent tracking discrepancies, please turn on <strong>"Set time automatically"</strong> in Windows Settings.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setClockSkewMinutes(0)}
+            className="shrink-0 rounded-lg bg-amber-200/70 hover:bg-amber-200 px-3 py-1 font-semibold text-amber-900 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Error Banner */}
       {error && (
         <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 text-xs font-semibold text-rose-800 shadow-xs">

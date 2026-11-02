@@ -1,5 +1,24 @@
 // frontend/src/api.js
 
+let serverOffsetMs = 0;
+let isClockSkewed = false;
+
+/**
+ * Returns current offset in ms between server clock and client local clock.
+ * Positive = server is ahead of client; Negative = server is behind client.
+ */
+export function getServerOffsetMs() {
+  return serverOffsetMs;
+}
+
+/**
+ * Returns monotonic synchronized timestamp based on authoritative server clock.
+ * Immune to user tampering with their local computer clock.
+ */
+export function getSafeNow() {
+  return Date.now() + serverOffsetMs;
+}
+
 let BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.PROD ? "http://13.201.46.13" : "http://localhost:3001");
@@ -233,6 +252,39 @@ export async function api(path, { method = "GET", body, token, headers, _isRetry
       headers: mergedHeaders,
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    // 🔒 Synchronize client clock with authoritative server timestamp
+    try {
+      const serverHeader = res.headers.get("X-Server-Time");
+      const dateHeader = res.headers.get("Date");
+      const serverEpoch = serverHeader
+        ? Number(serverHeader)
+        : (dateHeader ? new Date(dateHeader).getTime() : NaN);
+
+      if (!isNaN(serverEpoch) && serverEpoch > 0) {
+        serverOffsetMs = serverEpoch - Date.now();
+        const diffMinutes = Math.round(serverOffsetMs / 60000);
+
+        if (Math.abs(diffMinutes) >= 2) {
+          if (!isClockSkewed) {
+            isClockSkewed = true;
+            console.warn(`⚠️ System clock skew detected: computer clock is off by ${diffMinutes} minutes.`);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(
+                new CustomEvent("system:clock_skew", {
+                  detail: { offsetMs: serverOffsetMs, offsetMinutes: diffMinutes },
+                })
+              );
+            }
+          }
+        } else if (isClockSkewed) {
+          isClockSkewed = false;
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("system:clock_synced"));
+          }
+        }
+      }
+    } catch {}
   } catch (err) {
     const networkError = new Error(
       `Network error. Could not connect to server: ${url}`
