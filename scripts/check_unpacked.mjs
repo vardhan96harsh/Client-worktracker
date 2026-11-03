@@ -20,3 +20,4 @@ if (fs.existsSync(srcSetup) && !fs.existsSync(destSetup)) {
   fs.copyFileSync(srcSetup, destSetup);
   console.log("Created copy: Work Tracker Setup 2026.11.03.exe");
 }
+

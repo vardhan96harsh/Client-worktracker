@@ -41,19 +41,7 @@ export default function PauseAlertPopup() {
       const parsed = saved ? JSON.parse(saved) : null;
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     } catch {}
-    return [
-      {
-        sessionId: "sample-1",
-        employeeName: "Rishabh Thakur",
-        employeeId: "EMP-104",
-        designation: "Frontend Engineer",
-        projectName: "Work Tracker Desktop",
-        taskTitle: "Live Status Sync & Alerts",
-        pausedMinutes: 95,
-        lunchDeductedMinutes: 0,
-        pausedAt: new Date(Date.now() - 95 * 60 * 1000).toISOString(),
-      },
-    ];
+    return [];
   });
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -83,12 +71,7 @@ export default function PauseAlertPopup() {
     return () => typeof off === "function" && off();
   }, [soundEnabled]);
 
-  // Initial gentle chime on appearance
-  useEffect(() => {
-    if (soundEnabled) {
-      playChime();
-    }
-  }, [soundEnabled]);
+
 
   // 20-second auto-dismiss with hover pause
   useEffect(() => {
@@ -111,6 +94,8 @@ export default function PauseAlertPopup() {
 
   const currentAlert = alerts[currentIndex] || alerts[0];
   const totalAlerts = alerts.length;
+
+  if (!currentAlert) return null;
 
   const formattedTime = currentAlert?.pausedAt
     ? new Date(currentAlert.pausedAt).toLocaleTimeString([], {

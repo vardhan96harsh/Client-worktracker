@@ -16,3 +16,4 @@ console.log("PE Magic Header:", magic); // Expect 'MZ'
 if (magic === "MZ") {
   console.log("Valid Windows Executable binary confirmed!");
 }
+

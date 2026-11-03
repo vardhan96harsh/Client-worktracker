@@ -9,3 +9,4 @@ try {
 }
 execSync("git push origin main", { cwd, stdio: "inherit" });
 console.log("Git push completed successfully!");
+
