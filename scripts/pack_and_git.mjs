@@ -20,17 +20,17 @@ function run(cmd, cwd = rootDir) {
 // 1. Commit frontend submodule
 console.log("--- Syncing frontend ---");
 run("git add -A", frontendDir);
-run('git commit -m "fix(admin): eliminate in-app popup cards and duplicate pause alerts"', frontendDir);
+run('git commit -m "fix(heartbeat): keep heartbeat active across OS-level activity and background apps"', frontendDir);
 
 // 2. Commit electron submodule
 console.log("--- Syncing electron ---");
 run("git add -A", electronDir);
-run('git commit -m "fix(electron): eliminate OS notification duplicates, show only single bottom-right popup card"', electronDir);
+run('git commit -m "fix(electron): expose system:getIdleTime and ensure continuous background heartbeat"', electronDir);
 
 // 3. Commit umbrella repository
 console.log("--- Syncing umbrella repository ---");
 run("git add -A", rootDir);
-run('git commit -m "fix(admin-alerts): ensure exactly one bottom-right popup outside app with no in-app or OS duplicates"', rootDir);
+run('git commit -m "fix(tracking): prevent false auto-pauses when working in full-screen or background apps"', rootDir);
 run("git push origin main", rootDir);
 
 // 4. Package electron installer
@@ -47,4 +47,3 @@ if (fs.existsSync(src)) {
 }
 
 console.log("\n>>> ALL TASKS FINISHED SUCCESSFULLY <<<");
-
