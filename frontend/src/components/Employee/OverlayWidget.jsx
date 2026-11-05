@@ -373,8 +373,8 @@ function EmployeeOverlayWidget({ auth }) {
           const start = new Date(running.currentStart || running.createdAt).getTime();
           const tick = () => setElapsed(baseMs + Math.max(0, Date.now() - start));
           tick();
-          // ⚡ 500ms cadence ensures smooth second increments without skipping or heavy CPU load
-          timerRef.current = setInterval(tick, 500);
+          // ⚡ 1000ms cadence ensures smooth second increments with minimal CPU load
+          timerRef.current = setInterval(tick, 1000);
         } else if (paused) {
           setElapsed(Math.max(0, (paused.totalMinutes || 0) * 60000));
         } else {
@@ -408,7 +408,7 @@ function EmployeeOverlayWidget({ auth }) {
               const start = new Date(offSess.currentStart || offSess.createdAt).getTime();
               const tick = () => setElapsed(baseMs + Math.max(0, Date.now() - start));
               tick();
-              timerRef.current = setInterval(tick, 500);
+              timerRef.current = setInterval(tick, 1000);
             } else if (offSess.status === "paused") {
               setElapsed(Math.max(0, (offSess.totalMinutes || offSess.accumulatedMinutes || 0) * 60000));
             }
@@ -440,13 +440,13 @@ function EmployeeOverlayWidget({ auth }) {
     return () => clearTicker();
   }, []);
 
-  // 🔄 Periodic auto-sync every 10 seconds to ensure overlay never desyncs from backend
+  // 🔄 Periodic auto-sync every 30 seconds to ensure overlay never desyncs from backend
   useEffect(() => {
     const syncInterval = setInterval(() => {
       if (!offlineManager.isOffline()) {
         loadSessions();
       }
-    }, 10000);
+    }, 30000);
 
     return () => clearInterval(syncInterval);
   }, []);

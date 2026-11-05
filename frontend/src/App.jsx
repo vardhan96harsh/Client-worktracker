@@ -155,7 +155,6 @@ export default function App() {
   if (isOverlay)
     return (
       <ErrorBoundary>
-        <GlobalHeartbeat auth={auth} />
         <OverlayWidget />
       </ErrorBoundary>
     );

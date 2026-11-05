@@ -255,7 +255,7 @@ export default function WorkTimer({ auth, initialSelectedTask, onClearInitialTas
 
       update();
       // ⚡ 500ms cadence ensures smooth second transitions without CPU/render overhead
-      timerRef.current = setInterval(update, 500);
+      timerRef.current = setInterval(update, 1000);
     } else if (session?.status === "paused") {
       setElapsed(Math.max(0, (session.totalMinutes || session.accumulatedMinutes || 0) * 60000));
     } else {
