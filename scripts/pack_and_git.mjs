@@ -25,12 +25,12 @@ run('git commit -m "fix(heartbeat): keep heartbeat active across OS-level activi
 // 2. Commit electron submodule
 console.log("--- Syncing electron ---");
 run("git add -A", electronDir);
-run('git commit -m "fix(electron): expose system:getIdleTime and ensure continuous background heartbeat"', electronDir);
+run('git commit -m "fix(performance): eliminate GPU locks and enable background throttling to prevent lag in Adobe and Storyline 360"', electronDir);
 
 // 3. Commit umbrella repository
 console.log("--- Syncing umbrella repository ---");
 run("git add -A", rootDir);
-run('git commit -m "fix(tracking): prevent false auto-pauses when working in full-screen or background apps"', rootDir);
+run('git commit -m "fix(performance): optimize electron process and remove GPU contention with Adobe and Storyline 360"', rootDir);
 run("git push origin main", rootDir);
 
 // 4. Package electron installer
