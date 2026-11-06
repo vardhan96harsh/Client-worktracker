@@ -21,7 +21,7 @@ export function getSafeNow() {
 
 let BASE =
   import.meta.env.VITE_API_BASE ||
-  (import.meta.env.PROD ? "http://13.201.46.13" : "http://localhost:3001");
+  (import.meta.env.PROD ? "http://13.203.232.103" : "http://localhost:3001");
 
 let configPromise = null;
 let refreshPromise = null;
@@ -50,7 +50,7 @@ async function getApiBase() {
 
   // Web / production fallback
   if (import.meta.env.PROD && BASE.includes("localhost")) {
-    BASE = "http://13.201.46.13";
+    BASE = "http://13.203.232.103";
   }
 
   return BASE;
@@ -235,7 +235,7 @@ export async function api(path, { method = "GET", body, token, headers, _isRetry
           activeToken = storedToken;
         }
       }
-    } catch {}
+    } catch { }
   }
 
   const mergedHeaders = {
@@ -284,7 +284,7 @@ export async function api(path, { method = "GET", body, token, headers, _isRetry
           }
         }
       }
-    } catch {}
+    } catch { }
   } catch (err) {
     const networkError = new Error(
       `Network error. Could not connect to server: ${url}`
