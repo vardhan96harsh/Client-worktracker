@@ -1,0 +1,60 @@
+// backend/models/WorkSession.js
+import mongoose from "mongoose";
+
+const segmentSchema = new mongoose.Schema({
+  start: Date,
+  end: Date,
+  manual: { type: Boolean, default: false },
+  source: String,
+  remarkId: mongoose.Schema.Types.ObjectId,
+  remarkText: String,
+});
+
+
+const workSessionSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
+    task: { type: mongoose.Schema.Types.ObjectId, ref: "Task", default: null },
+    taskTitle: { type: String, default: null },
+
+    date: String, // YYYY-MM-DD
+    status: { type: String, enum: ["active", "paused", "stopped"], default: "active" },
+    segments: [segmentSchema],
+    accumulatedMinutes: { type: Number, default: 0 }, // float minutes
+    currentStart: Date,
+    pausedAt: { type: Date, default: null },
+    remarks: String,
+    customTask: { type: String, default: null },
+    // 🔹 Work type for this session
+    taskType: {
+      type: String,
+      enum: ["Alpha", "Beta", "CR", "Rework", "poc","Analysis","Storyboard QA","Output QA"],
+      default: "Alpha",
+    },
+
+
+
+    // ⬇️ NEW
+    machineId: String,
+    machineInfo: mongoose.Schema.Types.Mixed,
+    lastHeartbeatAt: { type: Date, default: null },
+
+  },
+  { timestamps: true }
+);
+
+// 🚀 Performance compound indexes for rapid polling, daily reports, and background cron jobs
+workSessionSchema.index({ user: 1, date: 1, status: 1 });
+workSessionSchema.index({ date: 1, status: 1 });
+workSessionSchema.index({ status: 1, currentStart: 1, lastHeartbeatAt: 1 });
+
+workSessionSchema.methods.totalMinutesNow = function () {
+  let total = this.accumulatedMinutes || 0;
+  if (this.status === "active" && this.currentStart) {
+    total += (Date.now() - new Date(this.currentStart)) / 60000;
+  }
+  return Math.round(total * 100) / 100;
+};
+
+export default mongoose.model("WorkSession", workSessionSchema);
