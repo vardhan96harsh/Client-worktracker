@@ -21,7 +21,7 @@ export function getSafeNow() {
 
 let BASE =
   import.meta.env.VITE_API_BASE ||
-  (import.meta.env.PROD ? "http://13.203.232.103" : "http://localhost:3001");
+  (import.meta.env.PROD ? "http://65.1.3.127" : "http://localhost:3001");
 
 let configPromise = null;
 let refreshPromise = null;
@@ -50,7 +50,7 @@ async function getApiBase() {
 
   // Web / production fallback
   if (import.meta.env.PROD && BASE.includes("localhost")) {
-    BASE = "http://13.203.232.103";
+    BASE = "http://65.1.3.127";
   }
 
   return BASE;
